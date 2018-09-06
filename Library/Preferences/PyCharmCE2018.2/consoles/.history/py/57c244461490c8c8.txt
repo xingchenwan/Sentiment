@@ -1,5 +1,3 @@
-from main import *
--. . -..- - / . -. - .-. -.--
 sdf
 -. . -..- - / . -. - .-. -.--
 with open(full_data_obj, 'rb') as f:
@@ -103,3 +101,135 @@ G = all_data.build_occurrence_network_graph(focus_dict=list(price_time_series.co
                                 node_color = str(count / size))
 >>> nx.draw_networkx_edges(G,pos, alpha=0.5)
 >>> plt.show()
+-. . -..- - / . -. - .-. -.--
+full_data_obj = 'full.date.20061020-20131120'
+market_data_path = 'data/top_entities.xlsx'
+market_data_sheet = 'Sheet3'
+
+with open(full_data_obj, 'rb') as f:
+    all_data = pickle.load(f, fix_imports=True, encoding='bytes')
+fix_fulldata(all_data)
+
+start_date = all_data.start_date
+end_date = all_data.end_date
+
+price_time_series, vol_time_series = process_market_time_series(market_data_path, market_data_sheet,
+                                                                start_date=pd.to_datetime(start_date),
+                                                                end_date=pd.to_datetime(end_date))
+
+# nx_graph = all_data.build_occurrence_network_graph(focus_dict=list(price_time_series.columns))
+
+
+count_time_series, sentiment_avg_time_series, sentiment_sum_time_series = process_count_sentiment(all_data,
+                                                                                                  include_list=list(
+                                                                                                      price_time_series.columns))
+res = correlator(price_time_series, vol_time_series, sentiment_avg_time_series, sentiment_sum_time_series,
+                 count_time_series, plot=False)
+-. . -..- - / . -. - .-. -.--
+res['PriceSumSentimentCorr']
+-. . -..- - / . -. - .-. -.--
+res['PriceSumSentimentLag']
+-. . -..- - / . -. - .-. -.--
+test_array = res['PriceSumSentimentLag']
+-. . -..- - / . -. - .-. -.--
+test_array
+-. . -..- - / . -. - .-. -.--
+from main import stat_tests
+-. . -..- - / . -. - .-. -.--
+stat_tests(test_array)
+-. . -..- - / . -. - .-. -.--
+b"abcde"
+-. . -..- - / . -. - .-. -.--
+type(b'abcde')
+-. . -..- - / . -. - .-. -.--
+isinstance(b'abcde', bytes)
+-. . -..- - / . -. - .-. -.--
+isinstance(b'abcde', string)
+-. . -..- - / . -. - .-. -.--
+isinstance(b'abcde', str)
+-. . -..- - / . -. - .-. -.--
+res
+-. . -..- - / . -. - .-. -.--
+from main import *
+-. . -..- - / . -. - .-. -.--
+full_data_obj = 'full.date.20061020-20131120'
+    market_data_path = 'data/top_entities.xlsx'
+    market_data_sheet = 'Sheet3'
+    sector_path = "source/sector.csv"
+
+    with open(full_data_obj, 'rb') as f:
+        all_data = pickle.load(f, fix_imports=True, encoding='bytes')
+    fix_fulldata(all_data)
+
+    start_date = all_data.start_date
+    end_date = all_data.end_date
+
+    price_time_series, vol_time_series = process_market_time_series(market_data_path, market_data_sheet,
+                                                                    start_date=pd.to_datetime(start_date),
+                                                                    end_date=pd.to_datetime(end_date))
+
+    # nx_graph = all_data.build_occurrence_network_graph(focus_dict=list(price_time_series.columns))
+
+    count_time_series, sentiment_avg_time_series, sentiment_sum_time_series = process_count_sentiment(all_data,
+                                                                    include_list=list(price_time_series.columns))
+    res = correlator(price_time_series, vol_time_series, sentiment_avg_time_series, sentiment_sum_time_series,
+                     count_time_series, plot=False, save_csv=True, display_summary_stats=False)
+
+    #stat_tests(res['PriceCountCorr'])
+    #stat_tests(res['PriceMedSentimentCorr'])
+    #stat_tests(res['PriceSumSentimentCorr'])
+    #stat_tests(res['VolCountCorr'])
+    #stat_tests(res['SpotVolCorr'])
+
+    sector = (get_sector(sector_path, 0, 2, res['Name']))
+-. . -..- - / . -. - .-. -.--
+full_data_obj = 'full.date.20061020-20131120'
+market_data_path = 'data/top_entities.xlsx'
+market_data_sheet = 'Sheet3'
+sector_path = "source/sector.csv"
+
+with open(full_data_obj, 'rb') as f:
+    all_data = pickle.load(f, fix_imports=True, encoding='bytes')
+fix_fulldata(all_data)
+
+start_date = all_data.start_date
+end_date = all_data.end_date
+
+price_time_series, vol_time_series = process_market_time_series(market_data_path, market_data_sheet,
+                                                                start_date=pd.to_datetime(start_date),
+                                                                end_date=pd.to_datetime(end_date))
+
+# nx_graph = all_data.build_occurrence_network_graph(focus_dict=list(price_time_series.columns))
+
+count_time_series, sentiment_avg_time_series, sentiment_sum_time_series = process_count_sentiment(all_data,
+                                                                                                  include_list=list(
+                                                                                                      price_time_series.columns))
+res = correlator(price_time_series, vol_time_series, sentiment_avg_time_series, sentiment_sum_time_series,
+                 count_time_series, plot=False, save_csv=True, display_summary_stats=False)
+
+# stat_tests(res['PriceCountCorr'])
+# stat_tests(res['PriceMedSentimentCorr'])
+# stat_tests(res['PriceSumSentimentCorr'])
+# stat_tests(res['VolCountCorr'])
+# stat_tests(res['SpotVolCorr'])
+
+sector = (get_sector(sector_path, 0, 2, res['Name']))
+
+-. . -..- - / . -. - .-. -.--
+plot_scatter(res['PriceMedSentimentCorr'], res['Name'],
+                 x_label='Stock Names', y_label='Correlation Coefficient', categories=sector)
+-. . -..- - / . -. - .-. -.--
+plot_scatter(res['PriceCountCorr'], res['Name'],
+                 x_label='Stock Names', y_label='Correlation Coefficient', categories=sector)
+-. . -..- - / . -. - .-. -.--
+plot_scatter(res['VolCountCorr'], res['Name'],
+                 x_label='Stock Names', y_label='Correlation Coefficient', categories=sector)
+-. . -..- - / . -. - .-. -.--
+plot_scatter(res['SpotVolCorr'], res['Name'],
+                 x_label='Stock Names', y_label='Correlation Coefficient', categories=sector)
+-. . -..- - / . -. - .-. -.--
+stat_tests(res['PriceCountCorr'])
+-. . -..- - / . -. - .-. -.--
+stat_tests(res['SpotVolCorr'])
+-. . -..- - / . -. - .-. -.--
+stat_tests(res['PriceSumSentimentCorr'])
