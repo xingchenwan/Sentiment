@@ -1,0 +1,105 @@
+from main import *
+-. . -..- - / . -. - .-. -.--
+sdf
+-. . -..- - / . -. - .-. -.--
+with open(full_data_obj, 'rb') as f:
+    all_data = pickle.load(f, fix_imports=True, encoding='bytes')
+fix_fulldata(all_data)
+
+start_date = all_data.start_date
+end_date = all_data.end_date
+
+price_time_series, vol_time_series = process_market_time_series(market_data_path, market_data_sheet,
+                                                                start_date=pd.to_datetime(start_date),
+                                                                end_date=pd.to_datetime(end_date))
+-. . -..- - / . -. - .-. -.--
+full_data_obj = 'full.date.20061020-20131120'
+market_data_path = 'data/top_entities.xlsx'
+market_data_sheet = 'Sheet3'
+
+with open(full_data_obj, 'rb') as f:
+    all_data = pickle.load(f, fix_imports=True, encoding='bytes')
+fix_fulldata(all_data)
+
+start_date = all_data.start_date
+end_date = all_data.end_date
+
+price_time_series, vol_time_series = process_market_time_series(market_data_path, market_data_sheet,
+                                                                start_date=pd.to_datetime(start_date),
+                                                                end_date=pd.to_datetime(end_date))
+
+-. . -..- - / . -. - .-. -.--
+import pydot
+-. . -..- - / . -. - .-. -.--
+import pydotplus
+-. . -..- - / . -. - .-. -.--
+import community
+-. . -..- - / . -. - .-. -.--
+partition = community.best_partition(G)
+-. . -..- - / . -. - .-. -.--
+size = float(len(set(partition.values())))
+-. . -..- - / . -. - .-. -.--
+pos = nx.spring_layout(G)
+-. . -..- - / . -. - .-. -.--
+pos = nx.nx_pydot.graphviz_layout(G)
+-. . -..- - / . -. - .-. -.--
+for com in set(partition.values()) :
+count += 1.
+list_nodes = [nodes for nodes in partition.keys()
+if partition[nodes] == com]
+nx.draw_networkx_nodes(G, pos, list_nodes, node_size = 20,
+                                node_color = str(count / size))
+-. . -..- - / . -. - .-. -.--
+pos = nx.fruchterman_reingold_layout(G)
+-. . -..- - / . -. - .-. -.--
+count = 0.
+-. . -..- - / . -. - .-. -.--
+for com in set(partition.values()) :
+    count += 1.
+    list_nodes = [nodes for nodes in partition.keys()
+    if partition[nodes] == com]
+    nx.draw_networkx_nodes(G, pos, list_nodes, node_size = 20,
+                                node_color = str(count / size))
+
+-. . -..- - / . -. - .-. -.--
+parition
+-. . -..- - / . -. - .-. -.--
+partition2 = community.generate_dendrogram(G)
+-. . -..- - / . -. - .-. -.--
+partition2
+-. . -..- - / . -. - .-. -.--
+partition
+-. . -..- - / . -. - .-. -.--
+pos = nx.spring_layout(partition)
+-. . -..- - / . -. - .-. -.--
+G = nx.erdos_renyi_graph(30, 0.05)
+>>> #first compute the best partition
+>>> partition = community.best_partition(G)
+>>>  #drawing
+>>> size = float(len(set(partition.values())))
+>>> pos = nx.spring_layout(G)
+>>> count = 0.
+>>> for com in set(partition.values()) :
+>>>     count += 1.
+>>>     list_nodes = [nodes for nodes in partition.keys()
+>>>                                 if partition[nodes] == com]
+>>>     nx.draw_networkx_nodes(G, pos, list_nodes, node_size = 20,
+                                node_color = str(count / size))
+>>> nx.draw_networkx_edges(G,pos, alpha=0.5)
+>>> plt.show()
+-. . -..- - / . -. - .-. -.--
+G = all_data.build_occurrence_network_graph(focus_dict=list(price_time_series.columns))
+-. . -..- - / . -. - .-. -.--
+>>> partition = community.best_partition(G)
+>>>  #drawing
+>>> size = float(len(set(partition.values())))
+>>> pos = nx.spring_layout(G)
+>>> count = 0.
+>>> for com in set(partition.values()) :
+>>>     count += 1.
+>>>     list_nodes = [nodes for nodes in partition.keys()
+>>>                                 if partition[nodes] == com]
+>>>     nx.draw_networkx_nodes(G, pos, list_nodes, node_size = 20,
+                                node_color = str(count / size))
+>>> nx.draw_networkx_edges(G,pos, alpha=0.5)
+>>> plt.show()

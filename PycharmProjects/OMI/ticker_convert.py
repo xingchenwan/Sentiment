@@ -11,6 +11,9 @@ def converter(path):
     data_frame = pd.DataFrame(ric_tickers)
     data_frame.to_csv("ric_tickers.csv")
 
+
+
+
 if __name__ == '__main__':
-    mapping_path = 'source/abbreviation_pairs.pkl'
-    converter(mapping_path)
+    path = 'data/top_entities.xlsx'
+    sheet = 'Sheet3'

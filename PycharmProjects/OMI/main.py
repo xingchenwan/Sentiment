@@ -6,7 +6,6 @@ import matplotlib.pylab as plt
 from collections import Counter
 import pandas as pd
 
-
 def fix_fulldata(full_data):
     """
     A temporary patch to resolve the incompatibility issue between Python 2.x and 3.x pickling
@@ -32,6 +31,8 @@ def fix_fulldata(full_data):
         day.entity_occur_day = {k.decode('utf8'): v for k, v in day.entity_occur_day.items()}
         for news in day.day_news:
             fix_object(news)
+            news.entity_occur = {k.decode('utf8'): v for k, v in news.entity_occur.items()}
+            news.entity_sentiment = {k.decode('utf8'): v for k, v in news.entity_sentiment.items()}
 
 
 def process_market_time_series(path, sheet, start_date=None, end_date=None):
@@ -172,7 +173,7 @@ def correlator(market_data, vol_data, sentiment_avg_data, sentiment_sum_data, co
     assert set(sentiment_avg_data.index) == set(count_data.index)
     intersect_dates = market_data.index.intersection(count_data.index)
     market_data = market_data.loc[intersect_dates].astype('float64')
-    benchmark_data = (np.log(market_data['FED']) - np.log(market_data['FED'].shift(1)))[1:] # SPX 500 log-return
+    benchmark_data = (np.log(market_data['_ALL']) - np.log(market_data['_ALL'].shift(1)))[1:] # MSCI log-return
 
     market_data_log = market_data.apply(lambda x: np.log(x) - np.log(x.shift(1)))[1:].subtract(benchmark_data, axis='index')
     # Superior log return over SPX return
@@ -254,6 +255,7 @@ def correlator(market_data, vol_data, sentiment_avg_data, sentiment_sum_data, co
     pd.DataFrame(res).to_csv('CorrRes.csv')
     print('Done')
 
+
 if __name__ == "__main__":
 
     full_data_obj = 'full.date.20061020-20131120'
@@ -268,9 +270,15 @@ if __name__ == "__main__":
     end_date = all_data.end_date
 
     price_time_series, vol_time_series = process_market_time_series(market_data_path, market_data_sheet,
-                                                    start_date=pd.to_datetime(start_date),
-                                                    end_date=pd.to_datetime(end_date))
+                                                                    start_date=pd.to_datetime(start_date),
+                                                                    end_date=pd.to_datetime(end_date))
+
+    nx_graph = all_data.build_occurrence_network_graph(focus_dict=list(price_time_series.columns))
+
+    '''
+    
 
     count_time_series, sentiment_avg_time_series, sentiment_sum_time_series = process_count_sentiment(all_data,
                                                                     include_list=list(price_time_series.columns))
     correlator(price_time_series, vol_time_series, sentiment_avg_time_series, sentiment_sum_time_series, count_time_series, plot=False)
+    '''
