@@ -148,10 +148,6 @@ isinstance(b'abcde', string)
 -. . -..- - / . -. - .-. -.--
 isinstance(b'abcde', str)
 -. . -..- - / . -. - .-. -.--
-res
--. . -..- - / . -. - .-. -.--
-from main import *
--. . -..- - / . -. - .-. -.--
 full_data_obj = 'full.date.20061020-20131120'
     market_data_path = 'data/top_entities.xlsx'
     market_data_sheet = 'Sheet3'
@@ -233,3 +229,65 @@ stat_tests(res['PriceCountCorr'])
 stat_tests(res['SpotVolCorr'])
 -. . -..- - / . -. - .-. -.--
 stat_tests(res['PriceSumSentimentCorr'])
+-. . -..- - / . -. - .-. -.--
+pd.datetime("2013-3-3")
+-. . -..- - / . -. - .-. -.--
+pd.datetime(2013)
+-. . -..- - / . -. - .-. -.--
+pd.datetime(2013, 1, 2)
+-. . -..- - / . -. - .-. -.--
+datetime.datetime("2013,1,2")
+-. . -..- - / . -. - .-. -.--
+full_data_obj = 'full.date.20061020-20131120'
+market_data_path = 'data/top_entities.xlsx'
+market_data_sheet = 'Sheet3'
+sector_path = "source/sector.csv"
+
+with open(full_data_obj, 'rb') as f:
+    all_data = pickle.load(f, fix_imports=True, encoding='bytes')
+fix_fulldata(all_data)
+
+G = create_sub_obj(all_data, datetime.date(2007, 1, 1), datetime.date(2008, 1, 1))
+-. . -..- - / . -. - .-. -.--
+from main improt *
+-. . -..- - / . -. - .-. -.--
+from main import *
+-. . -..- - / . -. - .-. -.--
+with open(full_data_obj, 'rb') as f:
+    all_data = pickle.load(f, fix_imports=True, encoding='bytes')
+fix_fulldata(all_data)
+
+G = create_sub_obj(all_data, datetime.date(2007, 1, 1), datetime.date(2008, 1, 1))
+-. . -..- - / . -. - .-. -.--
+G.start_date
+-. . -..- - / . -. - .-. -.--
+G.end_date
+-. . -..- - / . -. - .-. -.--
+G.entity_occur_dat
+-. . -..- - / . -. - .-. -.--
+G.entity_occur_day
+-. . -..- - / . -. - .-. -.--
+G.entity_occur_interval
+-. . -..- - / . -. - .-. -.--
+all_data.entity_occur_interval
+-. . -..- - / . -. - .-. -.--
+len(all_data.entity_sentiment_interval)
+-. . -..- - / . -. - .-. -.--
+len(G.entity_sentiment_interval)
+-. . -..- - / . -. - .-. -.--
+res
+-. . -..- - / . -. - .-. -.--
+start_date = all_data.start_date
+end_date = all_data.start_date + datetime.timedelta(180)
+
+price_time_series, vol_time_series = process_market_time_series(market_data_path, market_data_sheet,
+                                                                start_date=pd.to_datetime(start_date),
+                                                                end_date=pd.to_datetime(end_date))
+
+# nx_graph = all_data.build_occurrence_network_graph(focus_dict=list(price_time_series.columns))
+
+count_time_series, sentiment_avg_time_series, sentiment_sum_time_series = process_count_sentiment(all_data,
+                                                                                                  include_list=list(
+                                                                                                      price_time_series.columns))
+res = correlator(price_time_series, vol_time_series, sentiment_avg_time_series, sentiment_sum_time_series,
+                 count_time_series, plot=False, save_csv=True, display_summary_stats=False)

@@ -11,6 +11,7 @@ import os
 # import community
 import networkx as nx
 import numpy as np
+import copy
 
 from source.utils import *
 
@@ -152,9 +153,11 @@ class FullData:
         self.days = []
         self.date2daysID = {}
         self.news_number = 0
+        self.data_folder = data_folder
         self.load_full_data(data_folder)
         self.entity_occur_interval = {}
         self.entity_sentiment_interval = {}
+
 
     def load_full_data(self, date_folder):
         '''
@@ -176,7 +179,6 @@ class FullData:
         for each_date_string in date_list:
             each_date = string2date(each_date_string)
             if each_date >= self.start_date and each_date < self.end_date:
-
                 sub_folder_dir = os.path.join(path, each_date_string)
                 the_day = Day(sub_folder_dir, each_date)
                 self.days.append(the_day)
@@ -271,12 +273,12 @@ class FullData:
         else:
             return d_view
 
-    def build_occurrence_network_graph(self, top=-1, focus_dict=None):
+    def build_occurrence_network_graph(self, top=-1, focus_iterable=None):
         entity_occ_list = self.count_entity_occurance_news(top)
         entity_list = []
         for num, entity in entity_occ_list:
-            if len(focus_dict) > 0:
-                if entity in focus_dict:
+            if len(focus_iterable) > 0:
+                if entity in focus_iterable:
                     entity_list.append(entity)
             else:
                 entity_list.append(entity)
