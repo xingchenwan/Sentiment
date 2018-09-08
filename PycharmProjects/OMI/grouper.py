@@ -1,5 +1,6 @@
 # Grouper module: generate different classification of the entities, either based on dynamic cosine distance in relevant
 # co-occurrence matrices or by static sector categorisation
+# Xingchen Wan | Xingchen.Wan@st-annes.ox.ac.uk | Oxford-Man Institute of Quantitative Finance
 
 import datetime
 import pandas as pd
@@ -31,7 +32,7 @@ def get_dynamic_grouping(names, full_data_obj, start_date=None, end_date=None):
 
     full_data_sub = create_sub_obj(full_data_obj, start_date, end_date)
     nx_graph = full_data_sub.build_occurrence_network_graph(focus_iterable=names)
-    partition = community.best_partition(nx_graph, resolution=7)
+    partition = community.best_partition(nx_graph)#, resolution=7)
     return partition
 
 
@@ -69,3 +70,10 @@ def get_sector_grouping(names, path, name_col, sector_col):
     # print("Names not found in the lookup:", [i for i in names if i not in sector_lookup.keys()])
     return {name: sector_lookup[name] if name in sector_lookup.keys() else 'Unclassified' for name in names}
 
+
+def get_sector_peer(sector_dict, name):
+    if not isinstance(sector_dict, dict):
+        raise TypeError("sector_dict argument needs to be a dictionary.")
+    if name not in sector_dict:
+        raise ValueError("name not found in sector_dict")
+    return [key for key, value in sector_dict.items() if value == sector_dict[name]]

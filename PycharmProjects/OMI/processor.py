@@ -8,7 +8,7 @@ import statistics
 import datetime
 
 
-def process_market_time_series(path, sheet=None, start_date=None, end_date=None, period="weekly"):
+def process_market_time_series(path, sheet=None, start_date=None, end_date=None, period="weekly", focus_iterable=None):
     """
     Process the raw price series from Bloomberg
     :param path: path string of the price series document
@@ -49,6 +49,9 @@ def process_market_time_series(path, sheet=None, start_date=None, end_date=None,
     end_date = end_date if end_date and end_date <= raw.index[-1] else raw.index[-1]
     raw = raw[raw.index >= start_date]
     data = raw[raw.index <= end_date].astype('float64')
+    if focus_iterable:
+        focus_securities = [x for x in data.columns if x in focus_iterable]
+        data = data[focus_securities]
     # Truncate the price time series to be consistent with the count and sentiment time series
     daily_log_return = data.apply(lambda x: np.log(x) - np.log(x.shift(1)))
     period_log_return = data.apply(lambda x: np.log(x) - np.log(x.shift(shift_period)))
@@ -78,6 +81,12 @@ def process_count_sentiment(full_data_obj, start_date=None, end_date=None, mode=
         elif mode == 'daily': return True
         elif mode == 'weekly': return True if day.weekday() == 4 else False  # Snap to nearest Friday
         else: raise ValueError("Unrecognised mode. Only weekly, daily and monthly modes are currently supported.")
+
+    def non_zero_median(list_obj):
+        v = np.asarray(list_obj)
+        #v = v[np.nonzero(v)]
+        #return np.nanmedian(v) if len(v) else 0
+        return np.nanmean(v)
 
     # Misc sanity checks...
     if isinstance(start_date, datetime.datetime):
@@ -132,8 +141,9 @@ def process_count_sentiment(full_data_obj, start_date=None, end_date=None, mode=
             break
 
         if is_end_of_period(day.date, mode):
+
             aggregate_count_sum.append(period_count_sum)
-            aggregate_sentiment_med.append({k: statistics.median(v) if len(v) else 0 for k, v in period_sentiment_med.items()})
+            aggregate_sentiment_med.append({k: non_zero_median(v) if len(v) else 0 for k, v in period_sentiment_med.items()})
             aggregate_sentiment_sum.append(period_sentiment_sum)
             # Re-initialise the periodical sub-totals for the next period
             date_time_series.append(day.date)
@@ -154,11 +164,17 @@ def process_count_sentiment(full_data_obj, start_date=None, end_date=None, mode=
     count_time_series = pd.DataFrame(aggregate_count_sum).dropna(how='all')
     count_time_series["Time"] = date_time_series
     count_time_series.set_index('Time', inplace=True)
+    count_time_series.index = pd.to_datetime(count_time_series.index)
+
     sentiment_med_time_series = pd.DataFrame(aggregate_sentiment_med).dropna(how='all')
     sentiment_med_time_series["Time"] = date_time_series
     sentiment_med_time_series.set_index('Time', inplace=True)
+    sentiment_med_time_series.index = pd.to_datetime(sentiment_med_time_series.index)
+    # print(sentiment_med_time_series)
+
     sentiment_sum_time_series = pd.DataFrame(aggregate_sentiment_sum).dropna(how='all')
     sentiment_sum_time_series["Time"] = date_time_series
     sentiment_sum_time_series.set_index('Time', inplace=True)
+    sentiment_sum_time_series.index = pd.to_datetime(sentiment_sum_time_series.index)
 
     return count_time_series, sentiment_med_time_series, sentiment_sum_time_series

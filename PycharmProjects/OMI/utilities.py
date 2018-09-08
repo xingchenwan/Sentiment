@@ -1,4 +1,6 @@
 # Utilities module: provide some utilities functions
+# Xingchen Wan | Xingchen.Wan@st-annes.ox.ac.uk | Oxford-Man Institute of Quantitative Finance
+
 import datetime
 from source.all_classes import *
 
@@ -80,3 +82,4 @@ def create_sub_obj(parent_obj, start_date, end_date):
     for entity, num in copied_obj.entity_occur_interval.items():
         copied_obj.entity_sentiment_interval[entity] = total_sentiment[entity] / num
     return copied_obj
+

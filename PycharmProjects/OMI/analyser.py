@@ -1,47 +1,64 @@
-# Analyser: modules that conduct numerical analysis on the result
+# Analyser: modules that perform numerical analyses on the result
+# Xingchen Wan | Xingchen.Wan@st-annes.ox.ac.uk | Oxford-Man Institute of Quantitative Finance
+
 import numpy as np
 import pandas as pd
 import scipy.stats as st
 import matplotlib.pylab as plt
 
 
-def correlate(market_data, vol_data, sentiment_med_data, sentiment_sum_data, count_data, max_lag=2,
-              plot=True, save_csv=False,
-              display_summary_stats=True):
-
-    def normalised_corr(series1, series2, max_period=max_lag):
-        """
-        Compute the normalised cross-correlation between series1 and series2
-        :param series1: Series1, Pandas series or numpy array
-        :param series2: Series2, Pandas series or numpy array
-        :param max_period: Maximum lag between series1 and series2 allowed
-        :return: res: normalised cross-correlation coefficient, max_val: maximum correlation coefficient within the
-        allowed period of lag in terms of magnitude, max_idx: the lag (index) corresponding to that correlation
-        coefficient
-        """
-        series1 = (series1 - np.mean(series1)) / (np.std(series1) * len(series1))
-        series2 = (series2 - np.mean(series2)) / np.std(series2)
-        correl = np.correlate(series1, series2, mode='full')
-        res = correl[int((len(correl))/2):]
-        abs_series = np.abs(res[:max_period+1])
+def normalised_corr(series1, series2, max_lag=2, fix_lag=None):
+    """
+    Compute the normalised cross-correlation between series1 and series2
+    :param series1: Series1, Pandas series or numpy array
+    :param series2: Series2, Pandas series or numpy array
+    :param max_lag: Maximum lag between series1 and series2 allowed
+    :param fix_lag: fixed lag - this argument overrides the max_lag argument.
+    :return: res: normalised cross-correlation coefficients, max_val: maximum correlation coefficient within the
+    allowed period of lag in terms of magnitude, max_idx: the lag (index) corresponding to that correlation
+    coefficient
+    """
+    if isinstance(series1, pd.Series): series1 = series1.values
+    if isinstance(series2, pd.Series): series2 = series2.values
+    series1 = (series1 - np.mean(series1)) / (np.std(series1) * len(series1))
+    series2 = (series2 - np.mean(series2)) / np.std(series2)
+    correl = np.correlate(series2, series1, mode='full')
+    res = correl[int((len(correl)) / 2):]
+    # print(len(res))
+    if fix_lag is None:
+        abs_series = np.abs(res[:max_lag + 1])
         max_idx = np.argmax(abs_series)
         max_val = res[max_idx]
-        return res, max_val, max_idx
+    else:
+        max_idx = fix_lag
+        max_val = res[fix_lag - 1]
+    return res, max_val, max_idx
+
+
+def correlate(market_data, vol_data, sentiment_med_data, sentiment_sum_data, count_data, max_lag=2,
+              count_threshold=0,
+              plot=True, save_csv=False, fix_lag=None,
+              display_summary_stats=True,
+              focus_iterable=None):
 
     assert set(sentiment_med_data.index) == set(count_data.index)
+    assert set(sentiment_sum_data.index) == set(count_data.index)
     intersect_dates = market_data.index.intersection(count_data.index)
     market_data = market_data.loc[intersect_dates].astype('float64')
     benchmark_data = market_data['_ALL'] # MSCI log-return
 
-    # market_data = market_data.subtract(benchmark_data, axis='index')
+    market_data = market_data.subtract(benchmark_data, axis='index')
     # Superior log return over SPX return
     vol = vol_data.loc[intersect_dates].astype('float64')
     # market_data_bin = market_data.apply(lambda x: np.sign(x-x.shift(1)))[1:]
 
-    # Compute the log-return of the stock prices over the previous period. The first data is removed because it is a NaN
     res = []
+    if focus_iterable:
+        include_names = [x for x in focus_iterable if x in market_data.columns]
+    else:
+        include_names = list(market_data.columns)
 
-    for single_name in list(market_data.columns):
+    for single_name in include_names:
         if "." in single_name:
             # Special cases for BoJ and Fed where there are two underlying securities...
             sentiment_series_med = sentiment_med_data[single_name.split(".")[0]].astype('float64').values
@@ -57,7 +74,9 @@ def correlate(market_data, vol_data, sentiment_med_data, sentiment_sum_data, cou
             market_series = market_data[single_name].astype('float64').values
 
         non_nan_idx = ~np.isnan(market_series)
-        all_nan = True if np.isnan(market_series).all() else False
+        if count_threshold > 0:
+            non_nan_idx = np.logical_and(~np.isnan(market_series), (count_series > count_threshold))
+        all_nan = True if (non_nan_idx == False).all() else False
         # Flag that the entire numpy series consists of NaN
 
         if not all_nan:
@@ -68,20 +87,20 @@ def correlate(market_data, vol_data, sentiment_med_data, sentiment_sum_data, cou
             vol_series = vol_series[non_nan_idx]
             # Then prune the data to get rid of the NaNs
 
-            corr_count_price, max_corr_count_price, max_corr_count_price_idx = normalised_corr(count_series, market_series)
+            corr_count_price, max_corr_count_price, max_corr_count_price_idx = normalised_corr(count_series, market_series, max_lag=max_lag, fix_lag=fix_lag)
 
             corr_med_sentiment_price, max_med_corr_sentiment_price, \
-                max_corr_med_sentiment_price_idx = normalised_corr(sentiment_series_med, market_series)
+                max_corr_med_sentiment_price_idx = normalised_corr(sentiment_series_med, market_series, max_lag=max_lag, fix_lag=fix_lag)
 
             corr_sum_sentiment_price, max_sum_corr_sentiment_price, \
-                max_corr_sum_sentiment_price_idx = normalised_corr(sentiment_series_sum, market_series)
+                max_corr_sum_sentiment_price_idx = normalised_corr(sentiment_series_sum, market_series, max_lag=max_lag, fix_lag=fix_lag)
 
-            corr_count_vol, max_corr_count_vol, max_corr_count_vol_idx = normalised_corr(count_series, vol_series)
+            corr_count_vol, max_corr_count_vol, max_corr_count_vol_idx = normalised_corr(count_series, vol_series, max_lag=max_lag, fix_lag=fix_lag)
 
             corr_vol_sum_sentiment, max_corr_vol_sum_sentiment, \
-                max_corr_vol_sum_sentiment_idx = normalised_corr(sentiment_series_sum, vol_series)
+                max_corr_vol_sum_sentiment_idx = normalised_corr(sentiment_series_sum, vol_series, max_lag=max_lag, fix_lag=fix_lag)
 
-            corr_vol_price, max_corr_vol_price, max_corr_vol_price_idx = normalised_corr(market_series, vol_series)
+            corr_vol_price, max_corr_vol_price, max_corr_vol_price_idx = normalised_corr(market_series, vol_series, max_lag=max_lag, fix_lag=fix_lag)
 
             this_res = {'Name': single_name,
                         'PriceCountCorr': max_corr_count_price,
@@ -174,13 +193,137 @@ def stat_tests(data, threshold=0.05):
     return t, prob, mean_5, mean_95
 
 
-def get_top_n_entities(FullData_obj, n=200):
-    """
-    Return a dictionary of the entities that appear in the top-n ranks in the news covered in the FullData object.
-    Key is the (abbreviated) names of the entities and Value is the number of times the entities appeared
-    :param FullData_obj: a FullData Object
-    :param n:
-    :return:
-    """
-    return dict(sorted(FullData_obj.entity_occur_interval.items(), key=lambda x: x[1])[-n:])
+def rolling_correlate(name, roll_window_size, *input_frames, frame_names=[], fix_lag=None, max_lag=2,
+                      start_date=None, end_date=None, exclude_pairs=None, include_pairs=None,
+                      count_threshold={}):
 
+    if include_pairs:
+        if not isinstance(include_pairs, list):
+            raise TypeError("include_pairs need to be list of tuples with length 2")
+        elif not isinstance(include_pairs[0], tuple):
+            raise TypeError("include_pairs need to be list of tuples with length 2")
+        elif len(include_pairs[0]) != 2:
+            raise TypeError("include_pairs need to be list of tuples with length 2")
+
+    if exclude_pairs:
+        if not isinstance(exclude_pairs, list):
+            raise TypeError("Exclude_pairs need to be list of tuples with length 2")
+        elif not isinstance(exclude_pairs[0], tuple):
+            raise TypeError("Exclude_pairs need to be list of tuples with length 2")
+        elif len(exclude_pairs[0]) != 2:
+            raise TypeError("Exclude_pairs need to be list of tuples with length 2")
+    if frame_names and len(frame_names) != len(input_frames):
+        raise ValueError("Mismatch between data length and data_names length.")
+
+    series_collection = []
+    i = 0
+    for frame in input_frames:
+        try:
+            series = frame[name].astype('float64')
+            series.name = frame_names[i]
+            series_collection.append(series)
+        except KeyError:
+            print(name, " is not found in data argument position ", input_frames.index(frame))
+        i += 1
+    data = pd.concat(series_collection, axis=1, join='inner')
+    # data only contains where the dates of the different data frames intersect
+    if start_date:
+        start_date = pd.to_datetime(start_date)
+        if start_date > data.index[0]:
+            data = data[data.index >= start_date]
+        else: start_date = data.index[0]
+    else: start_date = data.index[0]
+
+    if end_date:
+        end_date = pd.to_datetime(end_date)
+        if end_date < data.index[-1]:
+            data = data[data.index <= end_date]
+        else: end_date = data.index[-1]
+    else: end_date = data.index[-1]
+    # Truncate the the data frame in accordance to the specified start and end dates
+    res = {}
+
+    roll_window_start = start_date+pd.to_timedelta(roll_window_size, unit='d')
+
+    #print("Analysis start date:", start_date)
+    #print("Rolling window start date", roll_window_start)
+    #print("Analysis end date:", end_date)
+
+    for i in range(len(data.columns)):
+        for j in range(i, len(data.columns)):
+            col_name1 = data.columns[i]
+            col_name2 = data.columns[j]
+            if exclude_pairs and ((col_name1, col_name2) in exclude_pairs or (col_name2, col_name1) in exclude_pairs):
+                continue
+            if include_pairs and ((col_name1, col_name2) not in include_pairs and (col_name2, col_name1) not in include_pairs):
+                continue
+            local_data1 = data[col_name1]
+            local_data2 = data[col_name2]
+            this_res = pd.Series(0, index=data.index[data.index >= roll_window_start])
+            this_res.name = "Corr" + col_name1 + "To" + col_name2
+
+            k = 0
+            for dt in this_res.index:
+                series1 = local_data1[dt-pd.to_timedelta(roll_window_size, unit='d'):dt].values
+                series2 = local_data2[dt-pd.to_timedelta(roll_window_size, unit='d'):dt].values
+                if count_threshold:
+                    if col_name1 in count_threshold.keys():
+                        series1 = series1[series1 > count_threshold[col_name1]]
+                        series2 = series2[series1 > count_threshold[col_name1]]
+                    if col_name2 in count_threshold.keys():
+                        series1 = series1[series2 > count_threshold[col_name2]]
+                        series2 = series2[series2 > count_threshold[col_name2]]
+                # Select appropriate date range
+                if fix_lag is not None:
+                    _, this_res.iloc[k], _ = normalised_corr(series1, series2, fix_lag=fix_lag)
+                else:
+                    _, this_res.iloc[k], _ = normalised_corr(series1, series2, max_lag=max_lag)
+                k += 1
+            res[this_res.name] = this_res
+    return pd.DataFrame(res)
+
+
+def anomaly_correlate(name, roll_window_size, frame1, frame2, start_date=None, end_date=None,
+                      anomaly_threshold=3, significance_threshold=0.05):
+
+    def rolling_z_score(x, window):
+        r = x.rolling(window=window)
+        m = r.mean().shift(1)
+        s = r.std(ddof=0).shift(1)
+        z = (x-m)/s
+        return z
+    try:
+        series1 = frame1[name].astype('float64')
+        series2 = frame2[name].astype('float64')
+    except KeyError:
+        raise KeyError(name, " is not found in input")
+
+    data = pd.concat([series1, series2], axis=1, join='inner')
+    # data only contains where the dates of the different data frames intersect
+    if start_date:
+        start_date = pd.to_datetime(start_date)
+        if start_date > data.index[0]:
+            data = data[data.index >= start_date]
+
+    if end_date:
+        end_date = pd.to_datetime(end_date)
+        if end_date < data.index[-1]:
+            data = data[data.index <= end_date]
+
+    series1 = data.iloc[:, 0]
+    series2 = data.iloc[:, 1]
+    # Truncate the the data frame in accordance to the specified start and end dates
+
+    series1_rolling_z = rolling_z_score(series1, str(roll_window_size)+"D")
+    series2_rolling_z = rolling_z_score(series2, str(roll_window_size)+"D")
+    # Isolate the abnormal events
+
+
+    #series1_rolling_z.plot()
+    #series2_rolling_z.plot()
+    non_nan = np.logical_and(np.isfinite(series1_rolling_z), np.isfinite(series2_rolling_z))
+
+    a, _, _ = normalised_corr(series1_rolling_z[non_nan], series2_rolling_z[non_nan])
+    plt.plot(a)
+
+    plt.show()
