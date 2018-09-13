@@ -24,6 +24,7 @@ def normalised_corr(series1, series2, max_lag=2, fix_lag=None):
     series2 = (series2 - np.mean(series2)) / np.std(series2)
     correl = np.correlate(series2, series1, mode='full')
     res = correl[int((len(correl)) / 2):]
+    #res = correl[:]
     # print(len(res))
     if fix_lag is None:
         abs_series = np.abs(res[:max_lag + 1])
@@ -164,6 +165,14 @@ def correlate(market_data, vol_data, sentiment_med_data, sentiment_sum_data, cou
     return res
 
 
+def causality(series1, series2, maxlag=2):
+    from statsmodels.tsa.stattools import grangercausalitytests
+    combined = pd.concat([series1.astype('float64'), series2.astype('float64')], axis=1, join='inner')
+    combined = combined.values
+    combined = combined[~np.isnan(combined).any(axis=1)]
+    print(grangercausalitytests(combined, maxlag=maxlag))
+
+
 def stat_tests(data, threshold=0.05):
     """
     Perform a series of statistic tests: normal distribution test, t-test and confidence interval
@@ -245,10 +254,6 @@ def rolling_correlate(name, roll_window_size, *input_frames, frame_names=[], fix
 
     roll_window_start = start_date+pd.to_timedelta(roll_window_size, unit='d')
 
-    #print("Analysis start date:", start_date)
-    #print("Rolling window start date", roll_window_start)
-    #print("Analysis end date:", end_date)
-
     for i in range(len(data.columns)):
         for j in range(i, len(data.columns)):
             col_name1 = data.columns[i]
@@ -283,47 +288,27 @@ def rolling_correlate(name, roll_window_size, *input_frames, frame_names=[], fix
     return pd.DataFrame(res)
 
 
-def anomaly_correlate(name, roll_window_size, frame1, frame2, start_date=None, end_date=None,
-                      anomaly_threshold=3, significance_threshold=0.05):
-
-    def rolling_z_score(x, window):
-        r = x.rolling(window=window)
-        m = r.mean().shift(1)
-        s = r.std(ddof=0).shift(1)
-        z = (x-m)/s
-        return z
-    try:
-        series1 = frame1[name].astype('float64')
-        series2 = frame2[name].astype('float64')
-    except KeyError:
-        raise KeyError(name, " is not found in input")
-
-    data = pd.concat([series1, series2], axis=1, join='inner')
-    # data only contains where the dates of the different data frames intersect
-    if start_date:
-        start_date = pd.to_datetime(start_date)
-        if start_date > data.index[0]:
-            data = data[data.index >= start_date]
-
-    if end_date:
-        end_date = pd.to_datetime(end_date)
-        if end_date < data.index[-1]:
-            data = data[data.index <= end_date]
-
-    series1 = data.iloc[:, 0]
-    series2 = data.iloc[:, 1]
-    # Truncate the the data frame in accordance to the specified start and end dates
-
-    series1_rolling_z = rolling_z_score(series1, str(roll_window_size)+"D")
-    series2_rolling_z = rolling_z_score(series2, str(roll_window_size)+"D")
-    # Isolate the abnormal events
-
-
-    #series1_rolling_z.plot()
-    #series2_rolling_z.plot()
-    non_nan = np.logical_and(np.isfinite(series1_rolling_z), np.isfinite(series2_rolling_z))
-
-    a, _, _ = normalised_corr(series1_rolling_z[non_nan], series2_rolling_z[non_nan])
-    plt.plot(a)
-
-    plt.show()
+def rolling_x_correlate(roll_window_size, frame1, frame2, start_date=None, end_date=None,
+                        fix_lag=None, max_lag=2, plot=True):
+    data = pd.concat([frame1, frame2], axis=1, join='inner')
+    start_date = start_date if start_date and start_date > data.index[0] else \
+        data.index[0]
+    end_date = end_date if end_date and end_date < data.index[-1] else \
+        data.index[-1]
+    rolling_window_start = start_date + pd.to_timedelta(roll_window_size, unit='d')
+    res = pd.Series(0, index=data.index[data.index >= rolling_window_start])
+    res = res[res.index <= end_date]
+    i = 0
+    for dt in res.index:
+        sub_data_1 = data.iloc[:, 0]
+        sub_data_1 = sub_data_1[dt-pd.to_timedelta(roll_window_size, unit='d'):dt].values
+        sub_data_2 = data.iloc[:, 1]
+        sub_data_2 = sub_data_2[dt-pd.to_timedelta(roll_window_size, unit='d'):dt].values
+        if fix_lag is not None:
+            _, res.iloc[i], _ = normalised_corr(sub_data_1, sub_data_2, fix_lag=fix_lag)
+        else:
+            _, res.iloc[i], _ = normalised_corr(sub_data_1, sub_data_2, max_lag=max_lag)
+        i += 1
+    if plot:
+        res.plot()
+    return res

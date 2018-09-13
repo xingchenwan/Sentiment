@@ -273,7 +273,7 @@ class FullData:
         else:
             return d_view
 
-    def build_occurrence_network_graph(self, top=-1, focus_iterable=None):
+    def build_occurrence_network_graph(self, top=-1, focus_iterable=None, weight_threshold=None):
         entity_occ_list = self.count_entity_occurance_news(top)
         entity_list = []
         for num, entity in entity_occ_list:

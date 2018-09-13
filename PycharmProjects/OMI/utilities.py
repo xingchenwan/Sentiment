@@ -46,7 +46,7 @@ def fix_fulldata(full_data):
             news.entity_sentiment = _fix_iterables(news.entity_sentiment)
 
 
-def create_sub_obj(parent_obj, start_date, end_date):
+def create_sub_obj(parent_obj, start_date=None, end_date=None):
     """
     Create a new sub FullData object from an existing FullData object with a narrower range of dates.
     :param parent_obj: FullData object. The parent object
@@ -56,10 +56,19 @@ def create_sub_obj(parent_obj, start_date, end_date):
     """
     if not isinstance(parent_obj, FullData):
         raise TypeError("The parent_obj must be f FullData Type")
-    if not isinstance(start_date, datetime.date) or start_date < parent_obj.start_date:
-        raise ValueError("Start date needs to be of date type and should be later than the parent object start date!")
-    if not isinstance(end_date, datetime.date) or end_date > parent_obj.end_date:
-        raise ValueError("End date needs to be of date type and should be earlier than parent object end date")
+    if start_date and not isinstance(start_date, datetime.date):
+        raise ValueError("Start date needs to be of date type")
+    if end_date and not isinstance(end_date, datetime.date):
+        raise ValueError("End date needs to be of date type")
+
+    if start_date is None: start_date = parent_obj.start_date
+    if end_date is None: end_date = parent_obj.end_date
+
+    start_date = max(start_date, parent_obj.start_date)
+    end_date = min(end_date, parent_obj.end_date)
+
+    if start_date == parent_obj.start_date and end_date == parent_obj.end_date:
+        return parent_obj
     copied_obj = copy.deepcopy(parent_obj)
     # Create a copied object of the parent object first
 

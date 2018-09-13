@@ -7,9 +7,10 @@ import pandas as pd
 from source.all_classes import *
 import community
 from utilities import *
+import matplotlib.pyplot as plt
 
 
-def get_dynamic_grouping(names, full_data_obj, start_date=None, end_date=None):
+def get_dynamic_grouping(names, full_data_obj, start_date=None, end_date=None,save_to_csv=True):
     """
     Compute the dynamic grouping dictionary of a series of single names based on the cosine-distance of the entities
     within the specified period of time
@@ -31,8 +32,10 @@ def get_dynamic_grouping(names, full_data_obj, start_date=None, end_date=None):
     # Sanity Checks
 
     full_data_sub = create_sub_obj(full_data_obj, start_date, end_date)
-    nx_graph = full_data_sub.build_occurrence_network_graph(focus_iterable=names)
-    partition = community.best_partition(nx_graph)#, resolution=7)
+    G = full_data_sub.build_occurrence_network_graph(focus_iterable=names,)
+    partition = community.best_partition(G, weight='weight') #, resolution=7)
+    if save_to_csv:
+        pd.Series(partition).to_csv('dynamic_grouping'+str(start_date)+str(end_date)+'.csv')
     return partition
 
 
