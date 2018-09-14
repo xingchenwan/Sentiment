@@ -516,8 +516,6 @@ with open(full_data_obj, 'rb') as f:
     all_data = pickle.load(f, fix_imports=True, encoding='bytes')
 utilities.fix_fulldata(all_data)
 -. . -..- - / . -. - .-. -.--
-all_data
--. . -..- - / . -. - .-. -.--
 for day in all_data.days:
     print(day.entity_occur_day['MS'])
     print(day.entity_sentiment_day['MS'])
@@ -586,8 +584,6 @@ a[3]=False
 -. . -..- - / . -. - .-. -.--
 a[4]=False
 -. . -..- - / . -. - .-. -.--
-a
--. . -..- - / . -. - .-. -.--
 a is False
 -. . -..- - / . -. - .-. -.--
 (a == False).all()
@@ -649,3 +645,86 @@ sector = (grouper.get_sector_grouping(all, sector_path, 0, 2, ))
 -. . -..- - / . -. - .-. -.--
 dynamic = grouper.get_dynamic_grouping(all, all_data, start_date=datetime.date(2007, 7, 1),
                                            end_date=datetime.date(2007, 12, 31))
+-. . -..- - / . -. - .-. -.--
+a = [1, 2, 3]
+-. . -..- - / . -. - .-. -.--
+pd.Series(a)
+-. . -..- - / . -. - .-. -.--
+all_data
+-. . -..- - / . -. - .-. -.--
+all_data.days
+-. . -..- - / . -. - .-. -.--
+all_data.dates.day
+-. . -..- - / . -. - .-. -.--
+all_data.day[0].date
+-. . -..- - / . -. - .-. -.--
+all_data.days[0].date
+-. . -..- - / . -. - .-. -.--
+all_data.days[1].date
+-. . -..- - / . -. - .-. -.--
+all_data.days[2].date
+-. . -..- - / . -. - .-. -.--
+import pandas as pd
+-. . -..- - / . -. - .-. -.--
+a = pd.Series([1, 2, 3, 4, 5])
+-. . -..- - / . -. - .-. -.--
+a.shift(1)
+-. . -..- - / . -. - .-. -.--
+a.shift(-1)
+-. . -..- - / . -. - .-. -.--
+import numpy as np
+-. . -..- - / . -. - .-. -.--
+np.log(a.shift(-1)) - np.log(a)
+-. . -..- - / . -. - .-. -.--
+np.log(a) - np.log(a.shift(1))
+-. . -..- - / . -. - .-. -.--
+a = pd.Series([0,1,2,3,1,2,3])
+-. . -..- - / . -. - .-. -.--
+a.rolling()
+-. . -..- - / . -. - .-. -.--
+a.rolling(3).mean()
+-. . -..- - / . -. - .-. -.--
+from pandas.tseries.offsets import BDay
+
+-. . -..- - / . -. - .-. -.--
+import datetime
+-. . -..- - / . -. - .-. -.--
+today = datetime(2018, 9, 14)
+-. . -..- - / . -. - .-. -.--
+today = datetime.date(2018, 9, 14)
+-. . -..- - / . -. - .-. -.--
+today + BDay(0)
+-. . -..- - / . -. - .-. -.--
+today + BDay(2)
+-. . -..- - / . -. - .-. -.--
+today + BDay(-1)
+-. . -..- - / . -. - .-. -.--
+a = pd.Series([0, 1, 2, 4, 8, 4, 2, 1])
+-. . -..- - / . -. - .-. -.--
+a.plot()
+-. . -..- - / . -. - .-. -.--
+a.ewm(alpha=0.1).mean()
+-. . -..- - / . -. - .-. -.--
+a.ewm(alpha=0.9).mean().plot()
+-. . -..- - / . -. - .-. -.--
+a.ewm(alpha=0.1).mean().plot()
+-. . -..- - / . -. - .-. -.--
+a = pd.DataFrame([[1,2,3],[1,2,3],[1,2,3]])
+-. . -..- - / . -. - .-. -.--
+from scipy import stats
+-. . -..- - / . -. - .-. -.--
+stats.ttest_1samp(a, popmean=0)
+-. . -..- - / . -. - .-. -.--
+stats.ttest_1samp(a, popmean=0)[pvalue]
+-. . -..- - / . -. - .-. -.--
+stats.ttest_1samp(a, popmean=0)['pvalue']
+-. . -..- - / . -. - .-. -.--
+a
+-. . -..- - / . -. - .-. -.--
+a = pd.DataFrame([[1,2,1],[1,2,0],[1,2,-1]])
+-. . -..- - / . -. - .-. -.--
+stats.ttest_1samp(a, popmean=0)[1]
+-. . -..- - / . -. - .-. -.--
+range(-5, 5)
+-. . -..- - / . -. - .-. -.--
+list(range(-5, 5))

@@ -92,3 +92,6 @@ def create_sub_obj(parent_obj, start_date=None, end_date=None):
         copied_obj.entity_sentiment_interval[entity] = total_sentiment[entity] / num
     return copied_obj
 
+def normalise(series):
+    return (series - series.mean()) / (series.max() - series.min())
+

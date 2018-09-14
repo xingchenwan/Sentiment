@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import scipy.stats as st
 import matplotlib.pylab as plt
+from pandas.tseries.offsets import BDay
 
 
 def normalised_corr(series1, series2, max_lag=2, fix_lag=None):
@@ -22,7 +23,7 @@ def normalised_corr(series1, series2, max_lag=2, fix_lag=None):
     if isinstance(series2, pd.Series): series2 = series2.values
     series1 = (series1 - np.mean(series1)) / (np.std(series1) * len(series1))
     series2 = (series2 - np.mean(series2)) / np.std(series2)
-    correl = np.correlate(series2, series1, mode='full')
+    correl = np.correlate(series1, series2, mode='full')
     res = correl[int((len(correl)) / 2):]
     #res = correl[:]
     # print(len(res))
@@ -32,7 +33,7 @@ def normalised_corr(series1, series2, max_lag=2, fix_lag=None):
         max_val = res[max_idx]
     else:
         max_idx = fix_lag
-        max_val = res[fix_lag - 1]
+        max_val = res[fix_lag]
     return res, max_val, max_idx
 
 
@@ -55,7 +56,7 @@ def correlate(market_data, vol_data, sentiment_med_data, sentiment_sum_data, cou
 
     res = []
     if focus_iterable:
-        include_names = [x for x in focus_iterable if x in market_data.columns]
+        include_names = [x for x in focus_iterable if x in list(market_data.columns)]
     else:
         include_names = list(market_data.columns)
 
@@ -87,6 +88,8 @@ def correlate(market_data, vol_data, sentiment_med_data, sentiment_sum_data, cou
             sentiment_series_sum = sentiment_series_sum[non_nan_idx]
             vol_series = vol_series[non_nan_idx]
             # Then prune the data to get rid of the NaNs
+            all_series = [market_series, count_series, sentiment_series_med, sentiment_series_sum, vol_series]
+
 
             corr_count_price, max_corr_count_price, max_corr_count_price_idx = normalised_corr(count_series, market_series, max_lag=max_lag, fix_lag=fix_lag)
 
@@ -287,28 +290,128 @@ def rolling_correlate(name, roll_window_size, *input_frames, frame_names=[], fix
             res[this_res.name] = this_res
     return pd.DataFrame(res)
 
+#######################################################
+# Event-based analysis tools:
 
-def rolling_x_correlate(roll_window_size, frame1, frame2, start_date=None, end_date=None,
-                        fix_lag=None, max_lag=2, plot=True):
-    data = pd.concat([frame1, frame2], axis=1, join='inner')
-    start_date = start_date if start_date and start_date > data.index[0] else \
-        data.index[0]
-    end_date = end_date if end_date and end_date < data.index[-1] else \
-        data.index[-1]
-    rolling_window_start = start_date + pd.to_timedelta(roll_window_size, unit='d')
-    res = pd.Series(0, index=data.index[data.index >= rolling_window_start])
-    res = res[res.index <= end_date]
-    i = 0
-    for dt in res.index:
-        sub_data_1 = data.iloc[:, 0]
-        sub_data_1 = sub_data_1[dt-pd.to_timedelta(roll_window_size, unit='d'):dt].values
-        sub_data_2 = data.iloc[:, 1]
-        sub_data_2 = sub_data_2[dt-pd.to_timedelta(roll_window_size, unit='d'):dt].values
-        if fix_lag is not None:
-            _, res.iloc[i], _ = normalised_corr(sub_data_1, sub_data_2, fix_lag=fix_lag)
-        else:
-            _, res.iloc[i], _ = normalised_corr(sub_data_1, sub_data_2, max_lag=max_lag)
-        i += 1
-    if plot:
-        res.plot()
+
+def _get_z_score(frame, window):
+    r = frame.rolling(window=window)
+    m = r.mean()
+    s = r.std(ddof=0)
+    return (frame-m)/s
+
+
+def _get_event_series(z_score_series, threshold, ignore_window=10):
+    event_series = pd.Series(0, index=z_score_series.index)
+    ignore_cnt = 0
+    for i in range(len(z_score_series)):
+        if ignore_cnt != 0:
+            ignore_cnt -= 1
+        pt = z_score_series[i]
+        if pt > threshold: status = 1
+        elif pt < -threshold: status = -1
+        else: status = 0
+
+        if ignore_cnt: status = 0
+        if status != 0 and ignore_cnt == 0:
+            ignore_cnt = ignore_window
+        event_series.iloc[i] = status
+    return event_series
+
+
+def vol_event_analyser(names, vol_frame, exogen_frame, rolling_window=90, detection_threshold=3, max_lag=5):
+
+    def get_event_vol(name, event_series, vol_series, max_lag):
+        event_cnt = event_series[event_series == 1].count()
+        res = pd.DataFrame(0, index=[i for i in range(event_cnt)], columns=['Name', 'EventDate'] +
+                                                                           [i for i in range(-2*max_lag, 1)])
+        i = 0
+        for day in range(len(event_series)):
+            if event_series.iloc[day] == 1:
+                dt = event_series.index[day]
+                res.loc[i, 'Name'] = name
+                res.loc[i, 'EventDate'] = dt
+                for lag in range(-2*max_lag, 1):
+                    res.loc[i, lag] = vol_series[dt+BDay(lag)]
+        return res
+
+    res = pd.DataFrame(columns=['Name', 'EventDate'] + [i for i in range(-2*max_lag, 1)])
+    for name in names:
+        exogen_series = exogen_frame[name]
+        exogen_z_score = _get_z_score(exogen_series, rolling_window)
+        event = _get_event_series(exogen_z_score, detection_threshold)
+        this_res = get_event_vol(name, event, vol_frame[name], max_lag)
+        res = res.append(this_res, ignore_index=True)
+    print('Summary Stats:')
+    print(res.describe())
+    print('T-test')
+    print(st.ttest_1samp(res[list(range(-2*max_lag, 1))].values, popmean=0)[1])
+    res.to_csv('volEvent.csv')
     return res
+
+
+def event_analyser(names, log_return_frame, exogen_frame, rolling_window=90, detection_threshold=3, max_lag=5):
+
+    def get_abnormal_return(name, log_return_frame, date, window):
+        # The normal return is given by the Market Model over MSCI return.
+        open_date = date - pd.to_timedelta(window, 'D')
+        hist_returns = log_return_frame[['_ALL', name]]
+        hist_returns = hist_returns[(hist_returns.index >= open_date) & (hist_returns.index < date)]
+
+        mkt_return_today = log_return_frame.loc[date, '_ALL']
+        stock_return_today = log_return_frame.loc[date, name]
+
+        # Estimate alpha and beta using simple OLS
+        X = hist_returns['_ALL'].values
+        y = hist_returns[name].values
+        beta, alpha, r_val, p_val, std_err = st.linregress(X, y)
+        # disturb_var = 1/(window - 2)*np.sum(np.square(y - alpha - beta*X))
+        # print(beta)
+        abnormal_return = stock_return_today - alpha - beta * mkt_return_today
+        return abnormal_return
+
+    def get_event_cumulative_abnormal_return(name, event_series, daily_abnormal_return_series, max_lag):
+        event_cnt = event_series[event_series == 1].count() + event_series[event_series == -1].count()
+        res = pd.DataFrame(0, index=[i for i in range(event_cnt)], columns=['Name','EventDate', 'Type'] + [i for i in range(-max_lag, max_lag+1)])
+        i = 0
+        for day in range(len(event_series)):
+            if event_series.iloc[day] != 0:
+                dt = event_series.index[day]
+                res.loc[i, 'Name'] = name
+                res.loc[i, 'EventDate'] = dt
+                res.loc[i, 'Type'] = event_series.iloc[day]
+                cum_rtn = 0
+                for lag in range(-max_lag, max_lag+1):
+                    cum_rtn += daily_abnormal_return_series[dt+BDay(lag)]
+                    res.loc[i, lag] = cum_rtn
+                i += 1
+        return res
+
+    res = pd.DataFrame(columns=['Name','EventDate', 'Type'] + [i for i in range(-max_lag, max_lag+1)])
+    for name in names:
+        daily_abnormal_return = pd.Series(np.nan, index=log_return_frame.index)
+        for date in log_return_frame.index:
+            if date < log_return_frame.index[0] + pd.to_timedelta(rolling_window, 'D'):
+                continue
+            daily_abnormal_return[date] = get_abnormal_return(name, log_return_frame, date, window=180)
+
+        exogen_series = exogen_frame[name]
+        exogen_z_score = _get_z_score(exogen_series, rolling_window)
+        event = _get_event_series(exogen_z_score, detection_threshold)
+        this_res = get_event_cumulative_abnormal_return(name, event, daily_abnormal_return, max_lag)
+        res = res.append(this_res, ignore_index=True)
+    pos_res = res[res['Type'] == 1]
+    neg_res = res[res['Type'] == -1]
+
+    print('Summary Stats:Pos/Neg')
+    print(pos_res.describe())
+    print(neg_res.describe())
+
+    print('T-tests: Pos')
+    print(st.ttest_1samp(pos_res[list(range(-max_lag, max_lag+1))].values, popmean=0)[1])
+    print('T-tests: Neg')
+    print(st.ttest_1samp(neg_res[list(range(-max_lag, max_lag+1))].values, popmean=0)[1])
+
+    #pos_res.to_csv('posEvent.csv')
+    #neg_res.to_csv('negEvent.csv')
+    return pos_res, neg_res

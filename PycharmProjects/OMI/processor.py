@@ -4,11 +4,11 @@
 import pandas as pd
 import numpy as np
 from collections import Counter
-import statistics
 import datetime
 
 
-def process_market_time_series(path, sheet=None, start_date=None, end_date=None, period="weekly", focus_iterable=None):
+def process_market_time_series(path, sheet=None, start_date=None, end_date=None, period="weekly",
+                               focus_iterable=None):
     """
     Process the raw price series from Bloomberg
     :param path: path string of the price series document
@@ -42,7 +42,8 @@ def process_market_time_series(path, sheet=None, start_date=None, end_date=None,
         roll_period = '30D'
         shift_period = 21  # Trading month
     else:
-        raise ValueError("Invalid period mode")
+        roll_period = str(period) + 'D'
+        shift_period = int(period / 7 * 5)
 
     raw = pd.read_excel(path, sheetname=sheet)
     start_date = start_date if start_date and start_date >= raw.index[1] else raw.index[1]
@@ -53,14 +54,18 @@ def process_market_time_series(path, sheet=None, start_date=None, end_date=None,
         focus_securities = [x for x in data.columns if x in focus_iterable]
         data = data[focus_securities]
     # Truncate the price time series to be consistent with the count and sentiment time series
-    daily_log_return = data.apply(lambda x: np.log(x) - np.log(x.shift(1)))
-    period_log_return = data.apply(lambda x: np.log(x) - np.log(x.shift(shift_period)))
-    vol = daily_log_return.rolling(roll_period).std() # Weekly volatility
-
+    daily_log_return = data.apply(lambda x: np.log(x.shift(-1)) - np.log(x))
+    period_log_return = data.apply(lambda x: np.log(x.shift(-shift_period)) - np.log(x))
+    #daily_log_return = data.apply(lambda x: np.log(x) - np.log(x.shift(1)))
+    #period_log_return = data.apply(lambda x: np.log(x) - np.log(x.shift(shift_period)))
+    vol = daily_log_return.rolling(roll_period).std().shift(-shift_period) # Forward looking period volatility
+    #abs_daily_log_return = np.abs(daily_log_return)
+    #abs_period_log_return = np.abs(period_log_return)
     return data, daily_log_return, period_log_return, vol
 
 
-def process_count_sentiment(full_data_obj, start_date=None, end_date=None, mode='weekly', focus_iterable=None):
+def process_count_sentiment(full_data_obj, start_date=None, end_date=None, mode='weekly',
+                            rolling=False, rolling_smoothing_factor=0.2, focus_iterable=None):
     """
     Process the FullData object to obtain corresponding count and sentiment time series
     :param full_data_obj: The FullData object containing all the unprocessed count and sentiment information.
@@ -87,6 +92,11 @@ def process_count_sentiment(full_data_obj, start_date=None, end_date=None, mode=
         #v = v[np.nonzero(v)]
         #return np.nanmedian(v) if len(v) else 0
         return np.nanmean(v)
+
+    def moving_avg(list, alpha=rolling_smoothing_factor):
+        series = pd.Series(list).fillna(0, inplace=True)
+        ewm_series = series.ewm(alpha=alpha)
+        return ewm_series.iloc[-1]
 
     # Misc sanity checks...
     if isinstance(start_date, datetime.datetime):
@@ -128,37 +138,61 @@ def process_count_sentiment(full_data_obj, start_date=None, end_date=None, mode=
     period_sentiment_sum = Counter({})
     period_sentiment_med = Counter({})
 
-    i = 0
-    for day in full_data_obj.days:
-        if day.date < start_date:
-            continue
-        elif day.date == start_date:
-            i = 0
-            period_count_sum = Counter(dict((name, 0) for name in focus_iterable))
-            period_sentiment_med = Counter(dict((name, []) for name in focus_iterable))
-            period_sentiment_sum = Counter(dict((name, 0) for name in focus_iterable))
-        elif day.date > end_date:
-            break
+    # Setting appropriate period in terms of CALENDAR days
+    if mode == 'daily': period = 1
+    elif mode == 'weekly': period = 7
+    elif mode == 'monthly': period = 30
+    else: period = 7
 
-        if is_end_of_period(day.date, mode):
+    if rolling:
+        # Rolling weekly counters
+        for day in full_data_obj.days:
+            if day.date >= start_date and day.date <= end_date:
+                date_time_series.append(day.date)
+                day_count_sum = Counter(dict((name, 0) for name in focus_iterable))
+                day_sentiment_med = Counter(dict((name, 0) for name in focus_iterable))
+                day_sentiment_sum = Counter(dict((name, 0) for name in focus_iterable))
+                for name in focus_iterable:
+                    if name in day.entity_occur_day.keys():
+                        day_count_sum[name] = day.entity_occur_day[name]
+                        day_sentiment_med[name] = day.entity_sentiment_day[name]
+                        day_sentiment_sum[name] = day.entity_occur_day[name] * day.entity_sentiment_day[name]
+                aggregate_count_sum.append(day_count_sum)
+                aggregate_sentiment_med.append(day_sentiment_med)
+                aggregate_sentiment_sum.append(day_sentiment_sum)
 
-            aggregate_count_sum.append(period_count_sum)
-            aggregate_sentiment_med.append({k: non_zero_median(v) if len(v) else 0 for k, v in period_sentiment_med.items()})
-            aggregate_sentiment_sum.append(period_sentiment_sum)
-            # Re-initialise the periodical sub-totals for the next period
-            date_time_series.append(day.date)
-            period_count_sum = Counter(dict((name, 0) for name in focus_iterable))
-            period_sentiment_med = Counter(dict((name, []) for name in focus_iterable))
-            period_sentiment_sum = Counter(dict((name, 0) for name in focus_iterable))
+    else:
+        # Non-rolling counters - weekly counter set at every Friday
+        i = 0
+        for day in full_data_obj.days:
+            if day.date < start_date:
+                continue
+            elif day.date == start_date:
+                i = 0
+                period_count_sum = Counter(dict((name, 0) for name in focus_iterable))
+                period_sentiment_med = Counter(dict((name, []) for name in focus_iterable))
+                period_sentiment_sum = Counter(dict((name, 0) for name in focus_iterable))
+            elif day.date > end_date:
+                break
 
-        else:
-            for news in day.day_news:
-                for entity in focus_iterable:
-                    if entity in news.entity_occur.keys():
-                        period_count_sum[entity] += news.entity_occur[entity]
-                        period_sentiment_med[entity].append(news.entity_sentiment[entity])
-                        period_sentiment_sum[entity] += news.entity_sentiment[entity]*news.entity_occur[entity]
-        i += 1
+            if is_end_of_period(day.date, mode):
+                aggregate_count_sum.append(period_count_sum)
+                aggregate_sentiment_med.append({k: non_zero_median(v) if len(v) else 0 for k, v in period_sentiment_med.items()})
+                aggregate_sentiment_sum.append(period_sentiment_sum)
+                # Re-initialise the periodical sub-totals for the next period
+                date_time_series.append(day.date)
+                period_count_sum = Counter(dict((name, 0) for name in focus_iterable))
+                period_sentiment_med = Counter(dict((name, []) for name in focus_iterable))
+                period_sentiment_sum = Counter(dict((name, 0) for name in focus_iterable))
+
+            else:
+                for news in day.day_news:
+                    for entity in focus_iterable:
+                        if entity in news.entity_occur.keys():
+                            period_count_sum[entity] += news.entity_occur[entity]
+                            period_sentiment_med[entity].append(news.entity_sentiment[entity])
+                            period_sentiment_sum[entity] += news.entity_sentiment[entity]*news.entity_occur[entity]
+            i += 1
 
     date_time_series = pd.Series(date_time_series)
     count_time_series = pd.DataFrame(aggregate_count_sum).dropna(how='all')
@@ -177,4 +211,8 @@ def process_count_sentiment(full_data_obj, start_date=None, end_date=None, mode=
     sentiment_sum_time_series.set_index('Time', inplace=True)
     sentiment_sum_time_series.index = pd.to_datetime(sentiment_sum_time_series.index)
 
+    if rolling:
+        sentiment_sum_time_series = sentiment_sum_time_series.ewm(alpha=rolling_smoothing_factor).mean()
+        count_time_series = count_time_series.rolling(window=period).sum()
+        sentiment_med_time_series = sentiment_med_time_series.ewm(alpha=rolling_smoothing_factor).mean()
     return count_time_series, sentiment_med_time_series, sentiment_sum_time_series

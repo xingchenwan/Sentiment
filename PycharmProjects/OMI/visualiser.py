@@ -57,11 +57,15 @@ def plot_scatter(data, data_labels, x_label=None, y_label=None, categories=None)
     plt.axhline(np.nanmedian(data), color="blue")
     if x_label: plt.xlabel(x_label)
     if y_label: plt.ylabel(y_label)
-    labels = list(categories.values())
+    if categories:
+        labels = list(categories.values())
 
     for i in range(len(data)):
-        ax.scatter(axis[i], data[i], c=c[i], label=labels[i] if labels[i] not in
+        if categories:
+            ax.scatter(axis[i], data[i], c=c[i], label=labels[i] if labels[i] not in
                                                                         plt.gca().get_legend_handles_labels()[1] else '')
+        else:
+            ax.scatter(axis[i], data[i], c=c[i])
         ax.annotate(data_labels.iloc[i], (axis[i], data[i]), fontsize=5)
     ax.legend()
 
