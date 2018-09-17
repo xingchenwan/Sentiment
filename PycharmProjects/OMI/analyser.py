@@ -350,7 +350,8 @@ def vol_event_analyser(names, vol_frame, exogen_frame, rolling_window=90, detect
     return res
 
 
-def event_analyser(names, log_return_frame, exogen_frame, rolling_window=90, detection_threshold=3, max_lag=5):
+def event_analyser(names, log_return_frame, exogen_frame, rolling_window=90, detection_threshold=3, max_lag=5,
+                   save_csv=False):
 
     def get_abnormal_return(name, log_return_frame, date, window):
         # The normal return is given by the Market Model over MSCI return.
@@ -404,14 +405,24 @@ def event_analyser(names, log_return_frame, exogen_frame, rolling_window=90, det
     neg_res = res[res['Type'] == -1]
 
     print('Summary Stats:Pos/Neg')
-    print(pos_res.describe())
-    print(neg_res.describe())
+    pos_summary_stat = pos_res.describe()
+    neg_summary_stat = neg_res.describe()
 
-    print('T-tests: Pos')
-    print(st.ttest_1samp(pos_res[list(range(-max_lag, max_lag+1))].values, popmean=0)[1])
-    print('T-tests: Neg')
-    print(st.ttest_1samp(neg_res[list(range(-max_lag, max_lag+1))].values, popmean=0)[1])
+    pos_res_stat_tests = pos_res[list(range(-max_lag, max_lag+1))]
+    neg_res_stat_tests = neg_res[list(range(-max_lag, max_lag+1))]
+    print('Stats tests: positive')
+    print('T-test', st.ttest_1samp(pos_res_stat_tests, popmean=0, nan_policy='omit')[1])
+    print('Wilcoxon: ')
+    for i in range(-max_lag, max_lag+1):
+        print(st.wilcoxon(pos_res_stat_tests[i])[1])
 
-    #pos_res.to_csv('posEvent.csv')
-    #neg_res.to_csv('negEvent.csv')
-    return pos_res, neg_res
+    print('Stats tests: negative')
+    print('T-test', st.ttest_1samp(neg_res_stat_tests, popmean=0, nan_policy='omit')[1])
+    print('Wilcoxon: ')
+    for i in range(-max_lag, max_lag+1):
+        print(st.wilcoxon(neg_res_stat_tests[i])[1])
+
+    if save_csv:
+        pos_res.to_csv('posEvent.csv')
+        neg_res.to_csv('negEvent.csv')
+    return pos_summary_stat, neg_summary_stat

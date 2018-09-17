@@ -600,8 +600,6 @@ np.correlate(b, a, 'full')
 -. . -..- - / . -. - .-. -.--
 from main improt *
 -. . -..- - / . -. - .-. -.--
-from main import *
--. . -..- - / . -. - .-. -.--
 full_data_obj = 'full.date.20061020-20131120'
     market_data_path = 'data/top_entities.xlsx'
     market_data_sheet = 'Sheet3'
@@ -728,3 +726,136 @@ stats.ttest_1samp(a, popmean=0)[1]
 range(-5, 5)
 -. . -..- - / . -. - .-. -.--
 list(range(-5, 5))
+-. . -..- - / . -. - .-. -.--
+from main import *
+-. . -..- - / . -. - .-. -.--
+full_data_obj = 'full.date.20061020-20131120'
+market_data_path = 'data/top_entities.xlsx'
+market_data_sheet = 'Sheet3'
+sector_path = "source/sector.csv"
+
+with open(full_data_obj, 'rb') as f:
+    all_data = pickle.load(f, fix_imports=True, encoding='bytes')
+utilities.fix_fulldata(all_data)
+
+start_date = datetime.date(2006, 10, 1)
+end_date = datetime.date(2013, 12, 31)
+
+sub_all_data = utilities.create_sub_obj(all_data, start_date, end_date)
+price, _, log_return, vol = processor.process_market_time_series(market_data_path, market_data_sheet,
+                                                                 start_date=pd.to_datetime(start_date),
+                                                                 end_date=pd.to_datetime(end_date),
+                                                                 )
+
+# dynamic = grouper.get_dynamic_grouping(all, sub_all_data)
+# visualiser.plot_network(sub_all_data, names=all, categories=dynamic)
+# plt.show()
+
+
+this_name = 'GS'
+all_names = list(price.columns)
+sector = grouper.get_sector_grouping(all_names, 'source/sector.csv', 0, 2)
+this_sector = grouper.get_sector_peer(sector, this_name)
+
+count, med_sentiment, sum_sentiment = processor.process_count_sentiment(all_data,
+                                                                        start_date=pd.to_datetime(start_date),
+                                                                        end_date=pd.to_datetime(end_date),
+                                                                        focus_iterable=all_names,
+                                                                        rolling=True)
+
+-. . -..- - / . -. - .-. -.--
+pos, neg = analyser.event_analyser(this_sector, log_return, sum_sentiment,)
+-. . -..- - / . -. - .-. -.--
+pos.mean()
+-. . -..- - / . -. - .-. -.--
+pos.mean
+-. . -..- - / . -. - .-. -.--
+pos.mean 
+-. . -..- - / . -. - .-. -.--
+pos.iloc[1, :]
+-. . -..- - / . -. - .-. -.--
+neg.iloc[i, :].plot()
+-. . -..- - / . -. - .-. -.--
+this_sector = grouper.get_sector_peer(sector, 'PFE')
+-. . -..- - / . -. - .-. -.--
+pos.iloc[1,:].plot()
+-. . -..- - / . -. - .-. -.--
+pos.iloc[0,:]
+-. . -..- - / . -. - .-. -.--
+neg.iloc[0,:]
+-. . -..- - / . -. - .-. -.--
+this_sector = grouper.get_sector_peer(sector, 'BP')
+-. . -..- - / . -. - .-. -.--
+this_sector = grouper.get_sector_peer(sector, 'VWGN')
+-. . -..- - / . -. - .-. -.--
+this_sector = grouper.get_sector_peer(sector, 'BMWG')
+-. . -..- - / . -. - .-. -.--
+pos.iloc[0, 0]
+-. . -..- - / . -. - .-. -.--
+neg.iloc[0, 0]
+-. . -..- - / . -. - .-. -.--
+this_sector = grouper.get_sector_peer(sector, 'RIO')
+-. . -..- - / . -. - .-. -.--
+this_sector = grouper.get_sector_peer(sector, 'AA')
+-. . -..- - / . -. - .-. -.--
+this_sector = grouper.get_sector_peer(sector, 'NISSAN')
+-. . -..- - / . -. - .-. -.--
+this_sector = grouper.get_sector_peer(sector, 'MCD')
+-. . -..- - / . -. - .-. -.--
+len(this_sector)
+-. . -..- - / . -. - .-. -.--
+pos.iloc[i, :].plot()
+-. . -..- - / . -. - .-. -.--
+this_sector = grouper.get_sector_peer(sector, 'AAPL')
+-. . -..- - / . -. - .-. -.--
+pos, neg = analyser.event_analyser(this_sector, log_return, sum_sentiment, max_lag=10)
+-. . -..- - / . -. - .-. -.--
+pos, neg = analyser.event_analyser(this_sector, log_return, sum_sentiment, max_lag=5)
+-. . -..- - / . -. - .-. -.--
+pos
+-. . -..- - / . -. - .-. -.--
+neg
+-. . -..- - / . -. - .-. -.--
+pos, neg = analyser.event_analyser(this_sector, log_return, sum_sentiment, max_lag=5, save_csv=True)
+-. . -..- - / . -. - .-. -.--
+count, med_sentiment, sum_sentiment = processor.process_count_sentiment(all_data,
+                                                                            start_date=pd.to_datetime(start_date),
+                                                                            end_date=pd.to_datetime(end_date),
+                                                                            focus_iterable=all_names,
+                                                                            rolling=True,
+                                                                            rolling_smoothing_factor=0.7)
+-. . -..- - / . -. - .-. -.--
+pos, neg = analyser.event_analyser(this_sector, log_return, sum_sentiment, max_lag=5, save_csv=False)
+-. . -..- - / . -. - .-. -.--
+price, daily_rtn, log_return, vol = processor.process_market_time_series(market_data_path, market_data_sheet,
+                                                                         start_date=pd.to_datetime(start_date),
+                                                                         end_date=pd.to_datetime(end_date),
+                                                                         )
+
+# dynamic = grouper.get_dynamic_grouping(all, sub_all_data)
+# visualiser.plot_network(sub_all_data, names=all, categories=dynamic)
+# plt.show()
+
+
+this_name = 'GS'
+all_names = list(price.columns)
+sector = grouper.get_sector_grouping(all_names, 'source/sector.csv', 0, 2)
+this_sector = grouper.get_sector_peer(sector, this_name)
+
+count, med_sentiment, sum_sentiment = processor.process_count_sentiment(all_data,
+                                                                        start_date=pd.to_datetime(start_date),
+                                                                        end_date=pd.to_datetime(end_date),
+                                                                        focus_iterable=all_names,
+                                                                        rolling=True,
+                                                                        rolling_smoothing_factor=0.8)
+
+-. . -..- - / . -. - .-. -.--
+analyser.event_analyser(this_sector, daily_rtn, sum_sentiment,)
+-. . -..- - / . -. - .-. -.--
+pos, neg = analyser.event_analyser(this_sector, daily_rtn, sum_sentiment,)
+-. . -..- - / . -. - .-. -.--
+pos.iloc[1, :].plot()
+-. . -..- - / . -. - .-. -.--
+neg.ioc[1, :].plot()
+-. . -..- - / . -. - .-. -.--
+neg.iloc[1, :].plot()
