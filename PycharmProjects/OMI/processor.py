@@ -38,6 +38,9 @@ def process_market_time_series(path, sheet=None, start_date=None, end_date=None,
     elif period == 'daily':
         roll_period = '1D'
         shift_period = 1
+    elif period == '2d':
+        roll_period = '2d'
+        shift_period = 2
     elif period == 'monthly':
         roll_period = '30D'
         shift_period = 21  # Trading month
@@ -58,7 +61,8 @@ def process_market_time_series(path, sheet=None, start_date=None, end_date=None,
     period_log_return = data.apply(lambda x: np.log(x.shift(-shift_period)) - np.log(x))
     #daily_log_return = data.apply(lambda x: np.log(x) - np.log(x.shift(1)))
     #period_log_return = data.apply(lambda x: np.log(x) - np.log(x.shift(shift_period)))
-    vol = daily_log_return.rolling(roll_period).std().shift(-shift_period) # Forward looking period volatility
+    #vol = daily_log_return.rolling(roll_period).std().shift(-shift_period) # Forward looking period volatility
+    vol = daily_log_return.abs()
     #abs_daily_log_return = np.abs(daily_log_return)
     #abs_period_log_return = np.abs(period_log_return)
     return data, daily_log_return, period_log_return, vol

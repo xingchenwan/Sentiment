@@ -168,14 +168,6 @@ def correlate(market_data, vol_data, sentiment_med_data, sentiment_sum_data, cou
     return res
 
 
-def causality(series1, series2, maxlag=2):
-    from statsmodels.tsa.stattools import grangercausalitytests
-    combined = pd.concat([series1.astype('float64'), series2.astype('float64')], axis=1, join='inner')
-    combined = combined.values
-    combined = combined[~np.isnan(combined).any(axis=1)]
-    print(grangercausalitytests(combined, maxlag=maxlag))
-
-
 def stat_tests(data, threshold=0.05):
     """
     Perform a series of statistic tests: normal distribution test, t-test and confidence interval
@@ -191,15 +183,14 @@ def stat_tests(data, threshold=0.05):
     data = data[~np.isnan(data)]
     # Clear NaNs from the data-set
     # print(data)
-    _, pval = st.mstats.normaltest(data)
-    if pval > threshold:  # Passed normal distribution test
-        print('Normal test passed - using t-tests')
     t, prob = st.ttest_1samp(data, 0)
+    wilcox, prob2 = st.wilcoxon(data)
     # Return the t-statistics and p-value on whether the data mean is significantly different from 0
     mean_5, mean_95 = st.t.interval(1-threshold, len(data)-1, loc=np.mean(data), scale=st.sem(data))
-    print('Normal test statistics', pval,
+    print(
           'T-statistic', t,
-          '2-tailed p-value', prob,
+          'T-test p-value', prob,
+          'WilCox', prob2,
           '95th Percentile', mean_95,
           '5th Percentile', mean_5)
     return t, prob, mean_5, mean_95
@@ -319,110 +310,211 @@ def _get_event_series(z_score_series, threshold, ignore_window=10):
     return event_series
 
 
+def get_abnormal_return(name, log_return_frame, date, window):
+    # The normal return is given by the Market Model over MSCI return.
+    open_date = date - pd.to_timedelta(window, 'D')
+    hist_returns = log_return_frame[['_ALL', name]]
+    hist_returns = hist_returns[(hist_returns.index >= open_date) & (hist_returns.index < date)]
+
+    mkt_return_today = log_return_frame.loc[date, '_ALL']
+    stock_return_today = log_return_frame.loc[date, name]
+
+    # Estimate alpha and beta using simple OLS
+    X = hist_returns['_ALL'].values
+    y = hist_returns[name].values
+    beta, alpha, r_val, p_val, std_err = st.linregress(X, y)
+    # disturb_var = 1/(window - 2)*np.sum(np.square(y - alpha - beta*X))
+    # print(beta)
+    abnormal_return = stock_return_today - alpha - beta * mkt_return_today
+    return abnormal_return
+
+
+def get_event_cumulative_abnormal_return(name, event_series, daily_abnormal_return_series, max_lag):
+    event_cnt = event_series[event_series == 1].count() + event_series[event_series == -1].count()
+    res = pd.DataFrame(0, index=[i for i in range(event_cnt)], columns=['Name','EventDate', 'Type'] + [i for i in range(-max_lag, max_lag+1)])
+    i = 0
+    for day in range(len(event_series)):
+        if event_series.iloc[day] != 0:
+            dt = event_series.index[day]
+            res.loc[i, 'Name'] = name
+            res.loc[i, 'EventDate'] = dt
+            res.loc[i, 'Type'] = event_series.iloc[day]
+            cum_rtn = 0
+            for lag in range(-max_lag, max_lag+1):
+                cum_rtn += daily_abnormal_return_series[dt+BDay(lag)]
+                res.loc[i, lag] = cum_rtn
+            i += 1
+    return res
+
+
+def get_event_vol(name, event_series, vol_series, max_lag):
+    event_cnt = event_series[event_series == 1].count()
+    res = pd.DataFrame(0, index=[i for i in range(event_cnt)], columns=['Name', 'EventDate'] +
+                                                                           [i for i in range(-2*max_lag, max_lag)])
+    i = 0
+    for day in range(len(event_series)):
+        if event_series.iloc[day] != 0:
+            dt = event_series.index[day]
+            res.loc[i, 'Name'] = name
+            res.loc[i, 'EventDate'] = dt
+            res.loc[i, 'Type'] = event_series.iloc[day]
+            for lag in range(-2*max_lag, max_lag):
+                res.loc[i, lag] = vol_series[dt+BDay(lag)]
+            i += 1
+    return res
+
+"""
 def vol_event_analyser(names, vol_frame, exogen_frame, rolling_window=90, detection_threshold=3, max_lag=5):
 
-    def get_event_vol(name, event_series, vol_series, max_lag):
-        event_cnt = event_series[event_series == 1].count()
-        res = pd.DataFrame(0, index=[i for i in range(event_cnt)], columns=['Name', 'EventDate'] +
-                                                                           [i for i in range(-2*max_lag, 1)])
-        i = 0
-        for day in range(len(event_series)):
-            if event_series.iloc[day] == 1:
-                dt = event_series.index[day]
-                res.loc[i, 'Name'] = name
-                res.loc[i, 'EventDate'] = dt
-                for lag in range(-2*max_lag, 1):
-                    res.loc[i, lag] = vol_series[dt+BDay(lag)]
-        return res
-
-    res = pd.DataFrame(columns=['Name', 'EventDate'] + [i for i in range(-2*max_lag, 1)])
+    res = pd.DataFrame(columns=['Name', 'EventDate', 'Type'] + [i for i in range(-2*max_lag, max_lag)])
     for name in names:
         exogen_series = exogen_frame[name]
         exogen_z_score = _get_z_score(exogen_series, rolling_window)
         event = _get_event_series(exogen_z_score, detection_threshold)
         this_res = get_event_vol(name, event, vol_frame[name], max_lag)
         res = res.append(this_res, ignore_index=True)
-    print('Summary Stats:')
-    print(res.describe())
-    print('T-test')
-    print(st.ttest_1samp(res[list(range(-2*max_lag, 1))].values, popmean=0)[1])
+
+    pos_res = res[res['Type'] == 1]
+    neg_res = res[res['Type'] == -1]
+
+    pos_summary_stat = pos_res.describe()
+    neg_summary_stat = neg_res.describe()
+
+    # Append t-test and Wilcoxon rank test p-values to the bottom of the result data frames
+    pos_res_stat_tests = pos_res[list(range(-2*max_lag, max_lag))]
+    neg_res_stat_tests = neg_res[list(range(-2*max_lag, max_lag))]
+    pos_pop_mean = np.nanmean(pos_res_stat_tests.loc[:, list(range(-2*max_lag, -1))].values)
+    neg_pop_mean = np.nanmean(neg_res_stat_tests.loc[:, list(range(-2*max_lag, -1))].values)
+
+    pos_summary_stat = pos_summary_stat.append(pd.Series(
+        st.ttest_1samp(pos_res_stat_tests, popmean=pos_pop_mean, nan_policy='omit')[1], name='t-test',
+        index=pos_res_stat_tests.columns))
+    wilcoxon_pos = pd.Series({i: st.wilcoxon(pos_res_stat_tests[i] - pos_pop_mean)[1]
+                              for i in range(-2*max_lag, max_lag)}, name='wilcoxon', index=pos_res_stat_tests.columns)
+    pos_summary_stat = pos_summary_stat.append(wilcoxon_pos)
+    neg_summary_stat = neg_summary_stat.append(pd.Series(
+        st.ttest_1samp(neg_res_stat_tests, popmean=neg_pop_mean, nan_policy='omit')[1], name='t-test',
+        index=neg_res_stat_tests.columns))
+    wilcoxon_neg = pd.Series({i: st.wilcoxon(neg_res_stat_tests[i] - neg_pop_mean)[1] for i in range(-2*max_lag, max_lag)},
+                             name='wilcoxon'
+                             , index=neg_res_stat_tests.columns)
+    neg_summary_stat = neg_summary_stat.append(wilcoxon_neg)
+    # print(pos_summary_stat)
+    # print(neg_summary_stat)
     res.to_csv('volEvent.csv')
-    return res
+    return pos_summary_stat, neg_summary_stat, pos_res, neg_res
+"""
 
 
-def event_analyser(names, log_return_frame, exogen_frame, rolling_window=90, detection_threshold=3, max_lag=5,
-                   save_csv=False):
+def event_analyser(names, market_frame, exogen_frame, rolling_window=180, detection_threshold=3, max_lag=5,
+                   save_csv=False, mode='rtn'):
+    if mode == 'rtn':
+        day_range = [i for i in range(-max_lag, max_lag+1)]
+    elif mode == 'vol':
+        day_range = [i for i in range(-2*max_lag, max_lag+1)]
+    else:
+        raise ValueError("Unrecognised mode argument: rtn or vol allowed")
 
-    def get_abnormal_return(name, log_return_frame, date, window):
-        # The normal return is given by the Market Model over MSCI return.
-        open_date = date - pd.to_timedelta(window, 'D')
-        hist_returns = log_return_frame[['_ALL', name]]
-        hist_returns = hist_returns[(hist_returns.index >= open_date) & (hist_returns.index < date)]
-
-        mkt_return_today = log_return_frame.loc[date, '_ALL']
-        stock_return_today = log_return_frame.loc[date, name]
-
-        # Estimate alpha and beta using simple OLS
-        X = hist_returns['_ALL'].values
-        y = hist_returns[name].values
-        beta, alpha, r_val, p_val, std_err = st.linregress(X, y)
-        # disturb_var = 1/(window - 2)*np.sum(np.square(y - alpha - beta*X))
-        # print(beta)
-        abnormal_return = stock_return_today - alpha - beta * mkt_return_today
-        return abnormal_return
-
-    def get_event_cumulative_abnormal_return(name, event_series, daily_abnormal_return_series, max_lag):
-        event_cnt = event_series[event_series == 1].count() + event_series[event_series == -1].count()
-        res = pd.DataFrame(0, index=[i for i in range(event_cnt)], columns=['Name','EventDate', 'Type'] + [i for i in range(-max_lag, max_lag+1)])
-        i = 0
-        for day in range(len(event_series)):
-            if event_series.iloc[day] != 0:
-                dt = event_series.index[day]
-                res.loc[i, 'Name'] = name
-                res.loc[i, 'EventDate'] = dt
-                res.loc[i, 'Type'] = event_series.iloc[day]
-                cum_rtn = 0
-                for lag in range(-max_lag, max_lag+1):
-                    cum_rtn += daily_abnormal_return_series[dt+BDay(lag)]
-                    res.loc[i, lag] = cum_rtn
-                i += 1
-        return res
-
-    res = pd.DataFrame(columns=['Name','EventDate', 'Type'] + [i for i in range(-max_lag, max_lag+1)])
+    res = pd.DataFrame(columns=['Name','EventDate', 'Type'] + day_range)
     for name in names:
-        daily_abnormal_return = pd.Series(np.nan, index=log_return_frame.index)
-        for date in log_return_frame.index:
-            if date < log_return_frame.index[0] + pd.to_timedelta(rolling_window, 'D'):
-                continue
-            daily_abnormal_return[date] = get_abnormal_return(name, log_return_frame, date, window=180)
+        if mode == 'rtn':
+            daily_abnormal_return = pd.Series(np.nan, index=market_frame.index)
+            for date in market_frame.index:
+                if date < market_frame.index[0] + pd.to_timedelta(rolling_window, 'D'):
+                    continue
+                daily_abnormal_return[date] = get_abnormal_return(name, market_frame, date, window=180)
 
         exogen_series = exogen_frame[name]
         exogen_z_score = _get_z_score(exogen_series, rolling_window)
         event = _get_event_series(exogen_z_score, detection_threshold)
-        this_res = get_event_cumulative_abnormal_return(name, event, daily_abnormal_return, max_lag)
+        #pos_event_idx = event[event == 1].index
+        #neg_event_idx = event[event == -1].index
+        #plt.scatter(pos_event_idx, exogen_series[pos_event_idx], marker='^', color = 'r', label='Positive Events')
+        #plt.scatter(neg_event_idx, exogen_series[neg_event_idx], marker='v', color='r', label='Negative Events')
+        #exogen_series.plot()
+        #plt.ylabel('SumSentiment')
+        #plt.show()
+        if mode == 'rtn':
+            this_res = get_event_cumulative_abnormal_return(name, event, daily_abnormal_return, max_lag)
+        else:
+            this_res = get_event_vol(name, event, market_frame[name], max_lag)
         res = res.append(this_res, ignore_index=True)
     pos_res = res[res['Type'] == 1]
     neg_res = res[res['Type'] == -1]
 
-    print('Summary Stats:Pos/Neg')
     pos_summary_stat = pos_res.describe()
     neg_summary_stat = neg_res.describe()
 
-    pos_res_stat_tests = pos_res[list(range(-max_lag, max_lag+1))]
-    neg_res_stat_tests = neg_res[list(range(-max_lag, max_lag+1))]
-    print('Stats tests: positive')
-    print('T-test', st.ttest_1samp(pos_res_stat_tests, popmean=0, nan_policy='omit')[1])
-    print('Wilcoxon: ')
-    for i in range(-max_lag, max_lag+1):
-        print(st.wilcoxon(pos_res_stat_tests[i])[1])
+    # Append t-test and Wilcoxon rank test p-values to the bottom of the result data frames
+    pos_res_stat_tests = pos_res[day_range]
+    neg_res_stat_tests = neg_res[day_range]
 
-    print('Stats tests: negative')
-    print('T-test', st.ttest_1samp(neg_res_stat_tests, popmean=0, nan_policy='omit')[1])
-    print('Wilcoxon: ')
-    for i in range(-max_lag, max_lag+1):
-        print(st.wilcoxon(neg_res_stat_tests[i])[1])
+    pos_pop_mean = np.nanmean(pos_res_stat_tests.loc[:, list(range(-2 * max_lag, -1))].values) if mode == 'vol' else 0
+    neg_pop_mean = np.nanmean(neg_res_stat_tests.loc[:, list(range(-2 * max_lag, -1))].values) if mode == 'vol' else 0
+
+    pos_summary_stat = pos_summary_stat.append(pd.Series(
+        st.ttest_1samp(pos_res_stat_tests, popmean=pos_pop_mean, nan_policy='omit')[1], name='t-test', index=pos_summary_stat.columns))
+    wilcoxon_pos = pd.Series({i: st.wilcoxon(pos_res_stat_tests[i] - pos_pop_mean)[1]
+                              for i in day_range}, name='wilcoxon', index=pos_summary_stat.columns)
+    pos_summary_stat = pos_summary_stat.append(wilcoxon_pos)
+    neg_summary_stat = neg_summary_stat.append(pd.Series(
+        st.ttest_1samp(neg_res_stat_tests, popmean=neg_pop_mean, nan_policy='omit')[1], name='t-test', index=neg_summary_stat.columns))
+    wilcoxon_neg = pd.Series({i: st.wilcoxon(neg_res_stat_tests[i] - neg_pop_mean)[1] for i in day_range}, name='wilcoxon'
+                              , index=neg_summary_stat.columns)
+    neg_summary_stat = neg_summary_stat.append(wilcoxon_neg)
+
+    print(pos_summary_stat)
+    print(neg_summary_stat)
 
     if save_csv:
         pos_res.to_csv('posEvent.csv')
         neg_res.to_csv('negEvent.csv')
-    return pos_summary_stat, neg_summary_stat
+    return pos_summary_stat, neg_summary_stat, pos_res, neg_res
+
+
+def network_event_analyser(leading_name, lagging_names, log_return_frame, exogen_frame, rolling_window=90, detection_threshold=2.5, max_lag=5):
+
+    def process_sub_result(df):
+        groupby = df.groupby('Name')
+        res = {}
+        for name, frame in groupby:
+            data_stat_test = frame[day_rng]
+            summary_stat = frame.describe()
+            ttest = pd.Series(st.ttest_1samp(data_stat_test, popmean=0, nan_policy='omit')[1], name='t-test', index=day_rng)
+            wilcoxon = pd.Series({i: st.wilcoxon(data_stat_test[i])[1] for i in day_rng}, name='wilcoxon', index=day_rng)
+            summary_stat = summary_stat.append(ttest)
+            summary_stat = summary_stat.append(wilcoxon)
+            res[name] = summary_stat
+        # Average:
+        data_stat_test = df[day_rng]
+        summary_stat = df.describe()
+        ttest = pd.Series(st.ttest_1samp(data_stat_test, popmean=0, nan_policy='omit')[1], name='t-test', index=day_rng)
+        wilcoxon = pd.Series({i: st.wilcoxon(data_stat_test[i])[1] for i in day_rng}, name='wilcoxon', index=day_rng)
+        summary_stat = summary_stat.append(ttest)
+        summary_stat = summary_stat.append(wilcoxon)
+        res['Average'] = summary_stat
+        return res
+
+    day_rng = [i for i in range(-max_lag, max_lag+1)]
+    exogen_series = exogen_frame[leading_name]
+    exogen_z_score = _get_z_score(exogen_series, rolling_window)
+    event = _get_event_series(exogen_z_score, detection_threshold)
+    # Get the sentiment event for the LEADING NAME
+    res = pd.DataFrame(columns=['Name','EventDate', 'Type'] + day_rng)
+
+    for lagging_name in lagging_names:
+        daily_abnormal_return = pd.Series(np.nan, index=log_return_frame.index)
+        for date in log_return_frame.index:
+            if date < log_return_frame.index[0] + pd.to_timedelta(rolling_window, 'D'):
+                continue
+            daily_abnormal_return[date] = get_abnormal_return(lagging_name, log_return_frame, date, window=180)
+        this_res = get_event_cumulative_abnormal_return(lagging_name, event, daily_abnormal_return, max_lag)
+        res = res.append(this_res, ignore_index=True)
+
+    pos = res[res['Type'] == 1]
+    neg = res[res['Type'] == -1]
+
+    pos_res = process_sub_result(pos)
+    neg_res = process_sub_result(neg)
+
+    return pos_res, neg_res

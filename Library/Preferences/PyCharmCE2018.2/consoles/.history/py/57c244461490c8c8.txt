@@ -662,8 +662,6 @@ all_data.days[1].date
 -. . -..- - / . -. - .-. -.--
 all_data.days[2].date
 -. . -..- - / . -. - .-. -.--
-import pandas as pd
--. . -..- - / . -. - .-. -.--
 a = pd.Series([1, 2, 3, 4, 5])
 -. . -..- - / . -. - .-. -.--
 a.shift(1)
@@ -717,8 +715,6 @@ stats.ttest_1samp(a, popmean=0)[pvalue]
 -. . -..- - / . -. - .-. -.--
 stats.ttest_1samp(a, popmean=0)['pvalue']
 -. . -..- - / . -. - .-. -.--
-a
--. . -..- - / . -. - .-. -.--
 a = pd.DataFrame([[1,2,1],[1,2,0],[1,2,-1]])
 -. . -..- - / . -. - .-. -.--
 stats.ttest_1samp(a, popmean=0)[1]
@@ -726,8 +722,6 @@ stats.ttest_1samp(a, popmean=0)[1]
 range(-5, 5)
 -. . -..- - / . -. - .-. -.--
 list(range(-5, 5))
--. . -..- - / . -. - .-. -.--
-from main import *
 -. . -..- - / . -. - .-. -.--
 full_data_obj = 'full.date.20061020-20131120'
 market_data_path = 'data/top_entities.xlsx'
@@ -859,3 +853,153 @@ pos.iloc[1, :].plot()
 neg.ioc[1, :].plot()
 -. . -..- - / . -. - .-. -.--
 neg.iloc[1, :].plot()
+-. . -..- - / . -. - .-. -.--
+import pandas as pd
+-. . -..- - / . -. - .-. -.--
+a = pd.DataFrame({a: 1, b: 2, c: 3})
+-. . -..- - / . -. - .-. -.--
+pos['mean']
+-. . -..- - / . -. - .-. -.--
+pos.loc[:]
+-. . -..- - / . -. - .-. -.--
+pos.loc['mean', :]
+-. . -..- - / . -. - .-. -.--
+full_data_obj = 'full.date.20061020-20131120'
+market_data_path = 'data/top_entities.xlsx'
+market_data_sheet = 'Sheet3'
+sector_path = "source/sector.csv"
+
+with open(full_data_obj, 'rb') as f:
+    all_data = pickle.load(f, fix_imports=True, encoding='bytes')
+utilities.fix_fulldata(all_data)
+
+start_date = datetime.date(2011, 10, 1)
+end_date = datetime.date(2013, 12, 31)
+
+sub_all_data = utilities.create_sub_obj(all_data, start_date, end_date)
+price, daily_rtn, log_return, vol = processor.process_market_time_series(market_data_path, market_data_sheet,
+                                                                         start_date=pd.to_datetime(start_date),
+                                                                         end_date=pd.to_datetime(end_date),
+                                                                         )
+
+# dynamic = grouper.get_dynamic_grouping(all, sub_all_data)
+# visualiser.plot_network(sub_all_data, names=all, categories=dynamic)
+# plt.show()
+
+
+this_name = 'GPS'
+all_names = list(price.columns)
+sector = grouper.get_sector_grouping(all_names, 'source/sector.csv', 0, 2)
+this_sector = grouper.get_sector_peer(sector, this_name)
+
+count, med_sentiment, sum_sentiment = processor.process_count_sentiment(all_data,
+                                                                        start_date=pd.to_datetime(start_date),
+                                                                        end_date=pd.to_datetime(end_date),
+                                                                        focus_iterable=all_names,
+                                                                        rolling=True,
+                                                                        rolling_smoothing_factor=0.7)
+
+pos, neg = analyser.event_analyser(['GPS'], daily_rtn, sum_sentiment, max_lag=5, rolling_window=90,
+                                   detection_threshold=2.5)
+-. . -..- - / . -. - .-. -.--
+visualiser.plot_events(pos, descp='Positive Events')
+
+-. . -..- - / . -. - .-. -.--
+visualiser.plot_events(pos, descp=['Positive Events'])
+
+-. . -..- - / . -. - .-. -.--
+a = np.array([1,2,3,4,5])
+-. . -..- - / . -. - .-. -.--
+a[[1,2]]
+-. . -..- - / . -. - .-. -.--
+a[1,2]
+-. . -..- - / . -. - .-. -.--
+a = [1, 2, 3, 4, 5]
+-. . -..- - / . -. - .-. -.--
+a += 1
+-. . -..- - / . -. - .-. -.--
+633+1246
+-. . -..- - / . -. - .-. -.--
+316+685
+-. . -..- - / . -. - .-. -.--
+384+417
+-. . -..- - / . -. - .-. -.--
+46+235
+-. . -..- - / . -. - .-. -.--
+376+579
+-. . -..- - / . -. - .-. -.--
+from main import *
+-. . -..- - / . -. - .-. -.--
+full_data_obj = 'full.date.20061020-20131120'
+market_data_path = 'data/top_entities.xlsx'
+market_data_sheet = 'Sheet3'
+sector_path = "source/sector.csv"
+
+with open(full_data_obj, 'rb') as f:
+    all_data = pickle.load(f, fix_imports=True, encoding='bytes')
+utilities.fix_fulldata(all_data)
+
+start_date = datetime.date(2007, 1, 1)
+end_date = datetime.date(2008, 1, 1)
+
+sub_all_data = utilities.create_sub_obj(all_data, start_date, end_date)
+price, daily_rtn, log_return, vol = processor.process_market_time_series(market_data_path, market_data_sheet,
+                                                                         start_date=pd.to_datetime(start_date),
+                                                                         end_date=pd.to_datetime(end_date),
+                                                                         )
+
+this_name = 'MS'
+all_names = list(price.columns)
+sector = grouper.get_sector_grouping(all_names, 'source/sector.csv', 0, 2)
+this_sector = grouper.get_sector_peer(sector, this_name)
+dynamic = grouper.get_dynamic_grouping(all_names, sub_all_data)
+
+-. . -..- - / . -. - .-. -.--
+visualiser.plot_network(sub_all_data, names=all_names, categories=dynamic, group_by='centrality')
+
+-. . -..- - / . -. - .-. -.--
+sub_all_data
+-. . -..- - / . -. - .-. -.--
+sub_all_data.build_occurrence_network_graph(all_names)
+-. . -..- - / . -. - .-. -.--
+sub_all_data.build_occurrence_network_graph(focus_iterable=all_names)
+-. . -..- - / . -. - .-. -.--
+G = sub_all_data.build_occurrence_network_graph(focus_iterable=all_names)
+-. . -..- - / . -. - .-. -.--
+centrality = list(nx.katz_centrality(G, weight='weight'))
+-. . -..- - / . -. - .-. -.--
+centrality = nx.katz_centrality(G, weight='weight')
+-. . -..- - / . -. - .-. -.--
+centrality
+-. . -..- - / . -. - .-. -.--
+sorted_centrality = sorted(centrality.items(), key=lambda kv: kv[1])
+-. . -..- - / . -. - .-. -.--
+sorted_centrality
+-. . -..- - / . -. - .-. -.--
+G
+-. . -..- - / . -. - .-. -.--
+G['MS']
+-. . -..- - / . -. - .-. -.--
+sorted(G['MS'].items(), key=lambda v: v[1][1])
+-. . -..- - / . -. - .-. -.--
+sorted(G['MS'].items(), key=lambda v: v[1]['weight'])
+-. . -..- - / . -. - .-. -.--
+sorted(G['MS'].items(), key=lambda v: -v[1]['weight'])
+-. . -..- - / . -. - .-. -.--
+A = sorted(G['MS'].items(), key=lambda v: -v[1]['weight'])
+-. . -..- - / . -. - .-. -.--
+A[:2]
+-. . -..- - / . -. - .-. -.--
+A
+-. . -..- - / . -. - .-. -.--
+A[0]
+-. . -..- - / . -. - .-. -.--
+A[0][1]
+-. . -..- - / . -. - .-. -.--
+A[0][1]['weight']
+-. . -..- - / . -. - .-. -.--
+a = {}
+-. . -..- - / . -. - .-. -.--
+a['e'] = 4
+-. . -..- - / . -. - .-. -.--
+a

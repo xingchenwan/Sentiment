@@ -9,7 +9,7 @@ import datetime
 import math
 import networkx as nx
 from utilities import create_sub_obj
-
+from collections import OrderedDict
 
 
 def get_color_map(data_labels, categories):
@@ -66,8 +66,8 @@ def plot_scatter(data, data_labels, x_label=None, y_label=None, categories=None)
                                                                         plt.gca().get_legend_handles_labels()[1] else '')
         else:
             ax.scatter(axis[i], data[i], c=c[i])
-        ax.annotate(data_labels.iloc[i], (axis[i], data[i]), fontsize=5)
-    ax.legend()
+        ax.annotate(data_labels.iloc[i], (axis[i], data[i]), fontsize=6)
+    plt.legend(prop={'size': 6})
 
 
 def plot_single_name(name, *args, arg_names=[], start_date=None, end_date=None):
@@ -144,3 +144,74 @@ def plot_network(full_data_obj, names=[], start_date=None, end_date=None, catego
         plt.colorbar(sm)
     else:
         raise NotImplemented()
+
+
+def plot_distribution_around_events(df):
+    import matplotlib.mlab as mlab
+
+    def gen_caption(days_to_event):
+        if days_to_event < 0:
+            return str(abs(days_to_event))+'d before event'
+        elif days_to_event == 0:
+            return "Event day"
+        else:
+            return str(days_to_event)+'d after event'
+
+    numeric_col_names = [i for i in list(df.columns) if isinstance(i, int)]
+    subplot_width = 2
+    subplot_height = math.ceil(len(numeric_col_names) / subplot_width)
+    df = df[numeric_col_names]
+    i = 0
+    for col in numeric_col_names:
+        ax = plt.subplot(subplot_width, subplot_height, i+1)
+        data = df[col].values
+        data = data[~np.isnan(data)]
+        mu = np.mean(data)
+        sigma = np.std(data)
+        n, bins, patches = plt.hist(data, 50, normed=1)
+        y = mlab.normpdf(bins, mu, sigma)
+        l = plt.plot(bins, y, 'r--', linewidth=1)
+        plt.xlabel('CAR')
+        plt.axvline(mu, color='red')
+        ax.set_title(gen_caption(col))
+        i += 1
+
+
+def plot_events(*event_summaries, descps, test_chosen='t-test', mode='rtn'):
+
+    def plot_event(event_summary, descp, test_chosen, mode):
+        if mode == 'vol':
+            event_summary = event_summary[[i for i in list(event_summary.columns) if isinstance(i, int)]]
+        xi = [x+1 for x in list(event_summary.columns)]
+        mean_val = event_summary.loc['mean', :].values
+        plt.plot(xi, mean_val, label=descp)
+        test_stats = event_summary.loc[test_chosen, :].values
+        sig_idx = np.argwhere((test_stats < 0.05) & (test_stats > 0.01))
+        v_sig_idx = np.argwhere(test_stats <= 0.01)
+        if len(sig_idx):
+            plt.plot(sig_idx+xi[0], mean_val[[sig_idx]], 'o', color='orange', label='p < 0.05')
+        if len(v_sig_idx):
+            plt.plot(v_sig_idx+xi[0], mean_val[[v_sig_idx]], 'o', color='red', label='p < 0.01')
+
+    if len(descps) != len(event_summaries):
+        raise ValueError("Descp length must match number of event summaries passed!")
+    for i in range(len(event_summaries)):
+        plot_event(event_summaries[i], descps[i], test_chosen=test_chosen, mode=mode)
+    if mode == 'rtn':
+        plt.axhline(0, color='k', linestyle='dashed')
+        plt.axvline(0, color='k', linestyle='dashed')
+        plt.xlabel('Days to the event')
+        plt.ylabel('Cumulative Abnormal Return (CAR)')
+    elif mode == 'vol':
+        plt.axhline(0, color='k', linestyle='dashed')
+        plt.axvline(0, color='k', linestyle='dashed')
+        plt.xlabel('Days to the event')
+        plt.ylabel('Volatility')
+    handles, labels = plt.gca().get_legend_handles_labels()
+    by_label = OrderedDict(zip(labels, handles))
+    plt.legend(by_label.values(), by_label.keys())
+
+
+def plot_x_events(event_summaries, test_chosen='t-test'):
+    for name, summary in event_summaries.items():
+        plot_events(summary, descps=[name], test_chosen=test_chosen, mode='rtn')
