@@ -928,8 +928,6 @@ a += 1
 -. . -..- - / . -. - .-. -.--
 376+579
 -. . -..- - / . -. - .-. -.--
-from main import *
--. . -..- - / . -. - .-. -.--
 full_data_obj = 'full.date.20061020-20131120'
 market_data_path = 'data/top_entities.xlsx'
 market_data_sheet = 'Sheet3'
@@ -976,8 +974,6 @@ sorted_centrality = sorted(centrality.items(), key=lambda kv: kv[1])
 -. . -..- - / . -. - .-. -.--
 sorted_centrality
 -. . -..- - / . -. - .-. -.--
-G
--. . -..- - / . -. - .-. -.--
 G['MS']
 -. . -..- - / . -. - .-. -.--
 sorted(G['MS'].items(), key=lambda v: v[1][1])
@@ -1002,4 +998,84 @@ a = {}
 -. . -..- - / . -. - .-. -.--
 a['e'] = 4
 -. . -..- - / . -. - .-. -.--
+from main import *
+-. . -..- - / . -. - .-. -.--
+full_data_obj = 'full.date.20061020-20131120'
+market_data_path = 'data/top_entities.xlsx'
+market_data_sheet = 'Sheet3'
+sector_path = "source/sector.csv"
+
+with open(full_data_obj, 'rb') as f:
+    all_data = pickle.load(f, fix_imports=True, encoding='bytes')
+utilities.fix_fulldata(all_data)
+
+start_date = datetime.date(2007, 1, 1)
+end_date = datetime.date(2014, 1, 1)
+
+sub_all_data = utilities.create_sub_obj(all_data, start_date, end_date)
+price, daily_rtn, log_return, vol = processor.process_market_time_series(market_data_path, market_data_sheet,
+                                                                         start_date=pd.to_datetime(start_date),
+                                                                         end_date=pd.to_datetime(end_date),
+                                                                         )
+
+############
+this_name = 'JPM'
+all_names = list(price.columns)
+sector = grouper.get_sector_grouping(all_names, 'source/sector.csv', 0, 2)
+this_sector = grouper.get_sector_peer(sector, this_name)
+# dynamic = grouper.get_dynamic_grouping(all_names, sub_all_data)
+# visualiser.plot_network(sub_all_data, names=all_names, categories=dynamic, group_by='centrality')
+# plt.show()
+
+count, med_sentiment, sum_sentiment = processor.process_count_sentiment(all_data,
+                                                                        start_date=pd.to_datetime(start_date),
+                                                                        end_date=pd.to_datetime(end_date),
+                                                                        focus_iterable=all_names,
+                                                                        rolling=True,
+                                                                        rolling_smoothing_factor=0.7)
+na = NetworkAnalyser(sub_all_data, all_names)
+neighbours = na.get_neighbours(this_name, max_neighbour=10, exclude=['LEHMQ'])
+pos, neg = analyser.network_event_analyser(this_name, neighbours['Names'].values, exogen_frame=sum_sentiment,
+                                           log_return_frame=daily_rtn)
+
+-. . -..- - / . -. - .-. -.--
+L = plt.legend()
+-. . -..- - / . -. - .-. -.--
+G
+-. . -..- - / . -. - .-. -.--
+L
+-. . -..- - / . -. - .-. -.--
+L.get_texts()[1].set_text('Group Average')
+
+
+-. . -..- - / . -. - .-. -.--
+plt.legend()
+-. . -..- - / . -. - .-. -.--
+plt.show()
+-. . -..- - / . -. - .-. -.--
+visualiser.plot_x_events(this_name, neg, specialOnly=True)
+
+-. . -..- - / . -. - .-. -.--
+rt
+-. . -..- - / . -. - .-. -.--
+na
+-. . -..- - / . -. - .-. -.--
+na.get_centrality()
+-. . -..- - / . -. - .-. -.--
+isnumeric(1)
+-. . -..- - / . -. - .-. -.--
+a = pd.DataFrame([1, 2,3,4,5,6,7,8])
+-. . -..- - / . -. - .-. -.--
 a
+-. . -..- - / . -. - .-. -.--
+a.rolling(window=1)
+-. . -..- - / . -. - .-. -.--
+b = a.rolling(window=2)
+-. . -..- - / . -. - .-. -.--
+a.mean()
+-. . -..- - / . -. - .-. -.--
+b.mean()
+-. . -..- - / . -. - .-. -.--
+b.std()
+-. . -..- - / . -. - .-. -.--
+b.mean() / b.std()

@@ -49,6 +49,7 @@ def process_market_time_series(path, sheet=None, start_date=None, end_date=None,
         shift_period = int(period / 7 * 5)
 
     raw = pd.read_excel(path, sheetname=sheet)
+    #print(raw)
     start_date = start_date if start_date and start_date >= raw.index[1] else raw.index[1]
     end_date = end_date if end_date and end_date <= raw.index[-1] else raw.index[-1]
     raw = raw[raw.index >= start_date]
