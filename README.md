@@ -1,4 +1,5 @@
 # Sentiment
+Summer Internship Project Sep-Oct 2018
 
 A project aiming to explore the relationships between sentiment of the news (Reuter news for this case, via NLP analysis of the textual information) and market reactions, including but not limited to:
 1) Price
