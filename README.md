@@ -1,12 +1,10 @@
 # Sentiment
-Summer Internship Project Sep-Oct 2018
+Summer Internship Project
 
 A project aiming to explore the relationships between sentiment of the news (Reuter news for this case, via NLP analysis of the textual information) and market reactions, including but not limited to:
 1) Price
 
 2) Volatilities
-
-3) Trading Volume
 
 Investigations include both 1) relationship between market reaction of the entity from its *own* sentiment and 2) the relationship between market reaction to sentiment of its peers.
 
@@ -18,4 +16,4 @@ Oxford-Man Institute of Quantitative Finance,
 
 University of Oxford 
 
-2018
+2018 - 2019
