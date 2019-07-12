@@ -7,6 +7,40 @@ from collections import Counter
 import datetime
 
 
+def process_beta_time_series(path, start_date=None, end_date=None, period="weekly"):
+    df = pd.read_csv(path)
+    assert all(string in df.columns for string in ['Date', 'Close'])
+    df = df[['Date', 'Close']]
+    # Initialise an datetime index
+    df_start_date = df['Date'].iloc[0]
+    df_end_date = df['Date'].iloc[-1]
+
+    # Change the datetime string to pandas datetime object
+    df['Date'] = pd.to_datetime(df['Date']).dt.date
+    df = df.set_index('Date')
+
+    # Set the start and end dates. The start date the later date between the "start_date" argument and the dataframe
+    # start date. The end date is the earlier date between the "end_Date" argument and the dataframe end date
+    start_date = max(df_start_date, start_date) if start_date is not None else df_start_date
+    end_date = min(df_end_date, end_date) if end_date is not None else df_end_date
+
+    # Create the pandas date index
+    date_idx = pd.date_range(start_date, end_date, freq='D')
+
+    # Initialise the series to return
+    data = df.reindex(date_idx)
+    data = data.fillna(method='ffill') # Forward fill the data entries
+
+    # Compute log return, period vol, daily_vol and etc
+    daily_log_return = data.apply(lambda x: np.log(x.shift(-1)) - np.log(x))
+    if period == 'weekly':
+        period_log_return = data.apply(lambda x: np.log(x.shift(-5)) - np.log(x))
+    else:
+        raise TypeError()
+    vol = daily_log_return.abs()
+    return data, daily_log_return, period_log_return, vol
+
+
 def process_market_time_series(path, sheet=None, start_date=None, end_date=None, period="weekly",
                                focus_iterable=None):
     """

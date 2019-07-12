@@ -7,7 +7,6 @@ import pandas as pd
 from source.all_classes import *
 import community
 from utilities import *
-import matplotlib.pyplot as plt
 
 
 def get_dynamic_grouping(names, full_data_obj, start_date=None, end_date=None,save_to_csv=True):

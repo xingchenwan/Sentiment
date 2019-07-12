@@ -2,6 +2,8 @@ import utilities
 from source.utils import cosine_distance
 import networkx as nx
 import community
+import matplotlib
+matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd

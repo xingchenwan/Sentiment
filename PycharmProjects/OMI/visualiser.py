@@ -3,6 +3,8 @@
 
 import numpy as np
 import pandas as pd
+import matplotlib
+matplotlib.use("TkAgg")
 import matplotlib.pylab as plt
 from analyser import _get_z_score, _get_event_series
 import datetime
@@ -76,7 +78,7 @@ def plot_single_name(name, *args, arg_names=[], start_date=None, end_date=None):
     start_date = start_date if start_date and isinstance(start_date, datetime.date) else datetime.datetime(2007, 1, 1)
     end_date = end_date if end_date and isinstance(end_date, datetime.date) else datetime.datetime(2014, 1, 1)
 
-    fig = plt.figure()
+    fig = plt.figure(figsize=(5, 5))
     subplot_width = 2
     subplot_height = 1
     i = 0
@@ -192,25 +194,25 @@ def plot_distribution_around_events(df):
         i += 1
 
 
-def plot_events(*event_summaries, descps, test_chosen='t-test', mode='rtn', special_line=False, plot_special_only=False,
+def plot_events(*event_summaries, descps, test_chosen='t-test', mode='vol', special_line=False, plot_special_only=False,
                 plot_sentiment=False):
+    plt.figure(figsize=(8, 6))
 
     def plot_event(event_summary, descp, test_chosen, ):
-        if mode == 'vol':
-            event_summary = event_summary[[i for i in list(event_summary.columns) if isinstance(i, int)]]
+        event_summary = event_summary[[i for i in list(event_summary.columns) if i.lstrip('-').isdigit()]]
 
-        xi = [x+1 for x in list(event_summary.columns)]
-        #xi = list(event_summary.columns)
+        xi = [int(x) for x in list(event_summary.columns)]
         mean_val = event_summary.loc['mean', :].values
-        z_val = event_summary.loc['AvgZScore',:].values
+        # z_val = event_summary.loc['AvgZScore',:].values
         if plot_sentiment:
             plt.subplot(211)
         if not special_line:
             if plot_special_only:
                 pass
             else:
-                plt.plot(xi, mean_val, linestyle='--', linewidth=0.6, label=descp)
+                plt.plot(xi, mean_val, linewidth=1, label=descp)
                 # plt.plot(xi, mean_val, label=descp)
+                # plt.fill_between(xi, mean_val-std_devs, mean_val+std_devs, alpha=0.2)
         else:
             plt.plot(xi, mean_val, linewidth=3.0, label=descp)
         if (not special_line) and (plot_special_only):
@@ -219,7 +221,6 @@ def plot_events(*event_summaries, descps, test_chosen='t-test', mode='rtn', spec
             test_stats = event_summary.loc[test_chosen, :].values
             sig_idx = np.argwhere((test_stats < 0.05) & (test_stats > 0.01))
             v_sig_idx = np.argwhere(test_stats <= 0.01)
-            # print(sig_idx, v_sig_idx)
             if len(sig_idx):
                 plt.plot(sig_idx+xi[0], mean_val[[sig_idx]], 'o', color='orange', label='p < 0.05')
             if len(v_sig_idx):
@@ -231,7 +232,7 @@ def plot_events(*event_summaries, descps, test_chosen='t-test', mode='rtn', spec
                 if plot_special_only:
                     pass
                 else:
-                    plt.plot(list(event_summary.columns), np.abs(z_val), linestyle='--', linewidth=0.6, label=descp)
+                    plt.plot(list(event_summary.columns), np.abs(z_val), linewidth=1, label=descp)
             else:
                 plt.plot(list(event_summary.columns), np.abs(z_val), linewidth=3.0, label=descp)
 
@@ -243,21 +244,22 @@ def plot_events(*event_summaries, descps, test_chosen='t-test', mode='rtn', spec
     if plot_sentiment:
         plt.subplot(211)
     if mode == 'rtn':
-        plt.axhline(0, color='k', linestyle='dashed')
-        plt.axvline(0, color='k', linestyle='dashed')
+        #plt.axhline(0, color='k',)
+        #plt.axvline(0, color='k',)
         plt.ylabel('Cumulative Abnormal Return (CAR)')
     elif mode == 'vol':
-        plt.axhline(0, color='k', linestyle='dashed')
-        plt.axvline(0, color='k', linestyle='dashed')
-        plt.ylabel('Daily Volumed Traded')
+        #plt.axhline(0, color='k', linestyle='dashed')
+        #plt.axvline(0, color='k', linestyle='dashed')
+        plt.ylabel('Volatility 1D')
     if plot_sentiment:
         plt.subplot(212)
-        plt.axvline(0, color='k', linestyle='dashed')
+        #plt.axvline(0, color='k', linestyle='dashed')
         plt.xlabel('Days to the event')
         plt.ylabel('Sentiment abs. z-score')
     handles, labels = plt.gca().get_legend_handles_labels()
     by_label = OrderedDict(zip(labels, handles))
-    plt.legend(by_label.values(), by_label.keys(), prop={'size': 6})
+    plt.grid(True)
+    plt.legend(by_label.values(), by_label.keys(), prop={'size': 6}, loc='upper right')
 
 
 def plot_x_events(leading_name, group_summary, sector_summary=None, test_chosen='t-test', specialOnly=False, mode='rtn'):
@@ -278,3 +280,4 @@ def plot_x_events(leading_name, group_summary, sector_summary=None, test_chosen=
                 isSpecial = False
             plot_events(summary, descps=[name], test_chosen=test_chosen, mode=mode,
                         special_line=isSpecial, plot_special_only=True)
+
